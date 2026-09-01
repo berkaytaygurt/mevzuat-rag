@@ -1,0 +1,29 @@
+# --- HTTP / scraping ---
+requests>=2.32
+certifi>=2024.7.4
+pymupdf>=1.24          # birincil PDF metin cikarici
+pypdf>=4.0             # yedek
+beautifulsoup4>=4.12
+lxml>=5.2
+
+# --- embedding (lokal GPU) ---
+# torch CUDA build'i ayrica kurulur, bkz. README:
+#   pip install torch --index-url https://download.pytorch.org/whl/cu124
+sentence-transformers>=3.0
+transformers>=4.44
+
+# --- vektor deposu + hibrit arama ---
+qdrant-client>=1.11
+rank-bm25>=0.2.2
+
+# --- generation (saglayici secmeli) ---
+google-genai>=0.3            # PROVIDER=gemini
+llama-cpp-python>=0.3        # PROVIDER=local
+
+# --- arayuz / CLI ---
+streamlit>=1.38
+python-dotenv>=1.0
+tqdm>=4.66
+
+# --- test ---
+pytest>=8.0

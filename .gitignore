@@ -1,0 +1,46 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+data/raw/*.html
+data/raw/*.json
+data/index/
+models/
+*.gguf
+*.db
+.streamlit/secrets.toml
+tools/
+*.exe
+*.log
+karsilastirma.txt
+
+# --- 01.09.2026 eklendi ---
+# Kulliyat ve indeksler tumuyle disarida: 16 GB'in tamami bu klasorlerde
+# ve hepsi kaynaktan yeniden uretilebilir. Depoya giden kod ~0.3 MB.
+data/
+*.pdf
+*.png
+.pytest_cache/
+
+# Olcum ciktilari (her calistirmada degisir)
+olcum_ciktisi.txt
+dogrulama.txt
+ceza_tarama.txt
+cekirdek_olcum.txt
+maxseq_olcum.txt
+genislet_olcum.txt
+hiyerarsi_olcum.txt
+avukat_testi.txt
+avukat_testi.json
+uzunkuyruk_testi.txt
+uzunkuyruk_testi.json
+cevap_anahtari.json
+sorular_*.txt
+# Gecici inceleme ciktilari
+d.txt
+z.txt
+k.txt
+o.txt
+s.txt
+r.txt

@@ -1,0 +1,45 @@
+TEMEL (yeniden siralama yok)
+==============================================================================
+ sira  soru                                         beklenen       bulunan
+------------------------------------------------------------------------------
+    1  yillik ucretli izin suresi kac gundur        4857 m.53      4857 m.53
+    2  yıllık izne hak kazanmak için ne kadar çalış 4857 m.53      4857 m.54
+    1  işçinin haklı nedenle derhal fesih hakkı     4857 m.24      4857 m.24
+    1  işverenin haklı nedenle derhal fesih hakkı   4857 m.25      4857 m.25
+  yok  ihbar öneli süreleri nedir                   4857 m.17      1593 m.115
+    4  fazla çalışma ücreti nasıl hesaplanır        4857 m.41      6098 m.402
+    1  haftalık çalışma süresi kaç saattir          4857 m.63      4857 m.63
+  yok  işe iade davası şartları                     4857 m.18      6706 m.22
+    3  kira bedelinin belirlenmesi                  6098 m.344     6098 m.307
+    1  kiracının aile konutunu feshi eşin rızası    6098 m.349     6098 m.349
+  yok  haksız fiil sorumluluğu                      6098 m.49      6102 m.632
+  yok  zamanaşımı süresi haksız fiilde              6098 m.72      6102 m.60
+    1  genel işlem koşulları                        6098 m.20      6098 m.20
+  yok  evlenme yaşı kaç                             4721 m.124     4721 m.308
+    1  boşanma sebebi zina                          4721 m.161     4721 m.161
+    1  evlilik birliğinin sarsılması boşanma        4721 m.166     4721 m.166
+    1  nişanlılığın bozulmasında maddi tazminat     4721 m.120     4721 m.120
+    2  velayet kime verilir                         4721 (kanun)   4722 m.15
+    1  mirasçılık belgesi                           4721 m.598     4721 m.598
+    4  hırsızlık suçunun cezası nedir               5237 m.141     5237 m.147
+    5  kasten öldürmenin cezası                     5237 m.81      5237 m.82
+    1  dolandırıcılık suçu                          5237 m.157     5237 m.157
+    3  hakaret suçunun cezası                       5237 m.125     5237 m.129
+    1  meşru savunma                                5237 m.25      5237 m.25
+    2  kişisel verilerin işlenme şartları           6698 m.5       6698 m.4
+    1  veri sorumlusunun aydınlatma yükümlülüğü     6698 m.10      6698 m.10
+    1  ilgili kişinin hakları nelerdir              6698 m.11      6698 m.11
+    5  ihtiyati tedbir kararı                       6100 m.389     6100 m.391
+    3  dava dilekçesinde bulunması gerekenler       6100 m.119     6100 m.129
+    1  trafik kazasında maddi ve manevi tazminat    2918 (kanun)   2918 m.90
+    1  tüketicinin ayıplı maldan doğan hakları      6502 (kanun)   6502 m.8
+  yok  emekli aylığı bağlanma şartları              5510 (kanun)   5434 m.41
+    3  anonim şirket kuruluşu                       6102 (kanun)   4046 m.20
+    1  icra takibine itiraz süresi                  2004 (kanun)   2004 m.142
+------------------------------------------------------------------------------
+soru sayisi : 34
+ilk-1       : 17/34  (%50)
+ilk-3       : 24/34  (%71)
+ilk-5       : 28/34  (%82)
+MRR         : 0.610
+sure        : 95.7 sn (2.81 sn/soru)

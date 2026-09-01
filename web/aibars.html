@@ -1,0 +1,471 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aibars — Mevzuat Asistanı</title>
+<style>
+  :root {
+    --bg:        #faf9f6;
+    --yuzey:     #ffffff;
+    --yuzey-alt: #f3f1ec;
+    --kenar:     #e2ddd3;
+    --kenar-ince:#eeeae2;
+    --metin:     #1a1815;
+    --metin-orta:#575249;
+    --metin-sol: #8a847a;
+    --vurgu:     #7b2d26;
+    --vurgu-bg:  #f7ecea;
+    --uyari:     #8a6212;
+    --uyari-bg:  #fbf3e0;
+    --serif:     "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --mono:      ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#141310; --yuzey:#1c1b16; --yuzey-alt:#232219; --kenar:#33302700;
+      --kenar:#332f27; --kenar-ince:#26241d;
+      --metin:#eeebe3; --metin-orta:#a8a297; --metin-sol:#7d776c;
+      --vurgu:#d9897a; --vurgu-bg:#2a1d1a;
+      --uyari:#d4a856; --uyari-bg:#282112;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#141310; --yuzey:#1c1b16; --yuzey-alt:#232219; --kenar:#332f27;
+    --kenar-ince:#26241d; --metin:#eeebe3; --metin-orta:#a8a297;
+    --metin-sol:#7d776c; --vurgu:#d9897a; --vurgu-bg:#2a1d1a;
+    --uyari:#d4a856; --uyari-bg:#282112;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--metin);
+    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+  .kabuk { max-width: 720px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ---------- üst bant ---------- */
+  header {
+    padding: 40px 0 34px; display: flex;
+    align-items: center; justify-content: space-between; gap: 16px;
+  }
+  .marka {
+    font-family: var(--serif); font-size: 27px; font-weight: 600;
+    letter-spacing: -.015em; line-height: 1;
+  }
+  .marka span { color: var(--vurgu); }
+  .durum {
+    font-size: 12px; color: var(--metin-sol); font-variant-numeric: tabular-nums;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .nokta {
+    width: 6px; height: 6px; border-radius: 50%; flex: none;
+    background: var(--metin-sol);
+  }
+  .nokta.acik { background: #5c8a63; }
+  .nokta.bekle { background: var(--uyari); animation: solma 1.4s ease-in-out infinite; }
+  .nokta.kapali { background: var(--vurgu); }
+  @keyframes solma { 0%,100%{opacity:1} 50%{opacity:.25} }
+
+  /* ---------- arama ---------- */
+  .arama { position: relative; }
+  #soru {
+    width: 100%; padding: 18px 60px 18px 20px;
+    font-family: var(--sans); font-size: 17px; color: var(--metin);
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-radius: 14px; resize: none; min-height: 60px; max-height: 220px;
+    overflow-y: auto; line-height: 1.5;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  #soru:focus {
+    outline: none; border-color: var(--vurgu);
+    box-shadow: 0 0 0 3px var(--vurgu-bg);
+  }
+  #soru::placeholder { color: var(--metin-sol); }
+  #gonder {
+    position: absolute; right: 11px; bottom: 11px;
+    width: 38px; height: 38px; display: grid; place-items: center;
+    color: #fff; background: var(--vurgu); border: none;
+    border-radius: 10px; cursor: pointer; transition: opacity .15s;
+  }
+  #gonder svg { width: 17px; height: 17px; }
+  #gonder:hover:not(:disabled) { opacity: .85; }
+  #gonder:disabled { opacity: .35; cursor: default; }
+
+  /* ---------- örnek sorular ---------- */
+  .ornekler {
+    display: flex; gap: 7px; flex-wrap: wrap; margin: 16px 0 0;
+  }
+  .ornek {
+    font-family: var(--sans); font-size: 13px; color: var(--metin-orta);
+    background: transparent; border: 1px solid var(--kenar);
+    border-radius: 999px; padding: 5px 13px; cursor: pointer;
+    transition: all .15s;
+  }
+  .ornek:hover { border-color: var(--vurgu); color: var(--vurgu); }
+
+  /* ---------- ayarlar (gizli) ---------- */
+  .ayar-satiri { margin-top: 14px; }
+  #ayarAc {
+    background: none; border: none; padding: 0; cursor: pointer;
+    font-family: var(--sans); font-size: 12.5px; color: var(--metin-sol);
+    display: inline-flex; align-items: center; gap: 5px;
+  }
+  #ayarAc:hover { color: var(--metin-orta); }
+  #ayarlar {
+    display: none; margin-top: 12px; padding: 14px 16px;
+    background: var(--yuzey-alt); border-radius: 10px;
+    font-size: 13.5px; color: var(--metin-orta);
+  }
+  #ayarlar.acik { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+  #ayarlar label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
+  #ayarlar input[type=checkbox] { accent-color: var(--vurgu); cursor: pointer; }
+  #ayarlar select {
+    font-family: var(--sans); font-size: 13px; color: var(--metin);
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-radius: 6px; padding: 3px 6px; cursor: pointer;
+  }
+
+  /* ---------- çıktı ---------- */
+  #cikti { margin-top: 40px; }
+
+  .karar {
+    border: 1px solid var(--cizgi);
+    border-left: 3px solid #8b6f47;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    background: var(--kart);
+  }
+  .karar-ad { font-weight: 600; font-size: 14px; }
+  .karar-tarih { margin-left: auto; font-size: 12px; opacity: .6; }
+  .karar-not {
+    font-size: 12px; opacity: .7; margin: -6px 0 10px 2px;
+  }
+  .cevap {
+    font-family: var(--serif); font-size: 18px; line-height: 1.75;
+    color: var(--metin); white-space: pre-wrap;
+    padding-left: 20px; border-left: 2px solid var(--vurgu);
+    margin-bottom: 44px;
+  }
+
+  .bolum-basligi {
+    font-size: 11px; font-weight: 600; letter-spacing: .1em;
+    text-transform: uppercase; color: var(--metin-sol);
+    padding-bottom: 10px; border-bottom: 1px solid var(--kenar-ince);
+    margin-bottom: 4px;
+  }
+
+  /* ---------- kanun grubu ---------- */
+  .grup { margin-bottom: 26px; }
+  .grup-basligi {
+    display: flex; align-items: baseline; gap: 9px;
+    font-size: 12.5px; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: var(--metin-orta);
+    padding: 0 0 9px; margin-bottom: 10px;
+    border-bottom: 2px solid var(--vurgu);
+  }
+  .grup-sayi {
+    font-size: 11px; font-weight: 500; color: var(--metin-sol);
+    letter-spacing: 0; text-transform: none;
+  }
+  .grup-kaynak {
+    margin-left: auto; font-size: 11px; font-weight: 500;
+    letter-spacing: 0; text-transform: none;
+    color: var(--vurgu); text-decoration: none; white-space: nowrap;
+  }
+  .grup-kaynak:hover { text-decoration: underline; }
+
+  /* ---------- madde kartı ---------- */
+  .madde {
+    background: var(--yuzey); border: 1px solid var(--kenar-ince);
+    border-radius: 10px; margin-bottom: 8px; overflow: hidden;
+    transition: border-color .15s;
+  }
+  .madde.acik { border-color: var(--kenar); }
+  .madde-bas {
+    padding: 13px 16px; cursor: pointer; display: flex;
+    align-items: center; gap: 13px;
+  }
+  .madde-bas:hover { background: var(--yuzey-alt); }
+  .madde-no {
+    flex: none; min-width: 62px;
+    font-size: 12.5px; font-weight: 700; color: var(--vurgu);
+    font-variant-numeric: tabular-nums;
+  }
+  .madde-baslik {
+    flex: 1; min-width: 0;
+    font-family: var(--serif); font-size: 16px; font-weight: 500;
+    line-height: 1.35;
+  }
+  .ok {
+    flex: none; font-size: 10px; color: var(--metin-sol);
+    transition: transform .18s;
+  }
+  .madde.acik .ok { transform: rotate(90deg); }
+  .rozet {
+    font-size: 10.5px; font-weight: 600; letter-spacing: .03em;
+    padding: 3px 9px; border-radius: 999px;
+    background: var(--uyari-bg); color: var(--uyari);
+    white-space: nowrap; flex: none;
+  }
+  .madde-govde {
+    display: none; padding: 4px 16px 18px;
+    font-family: var(--serif); font-size: 16px; line-height: 1.75;
+    color: var(--metin-orta);
+    border-top: 1px solid var(--kenar-ince);
+    margin: 0 0 0; padding-top: 14px;
+  }
+  .madde.acik .madde-govde { display: block; }
+  .madde-dip {
+    margin-top: 13px; font-size: 11.5px; color: var(--metin-sol);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- durumlar ---------- */
+  .bilgi, .hata {
+    padding: 16px 18px; border-radius: 10px; font-size: 14.5px;
+    line-height: 1.55; margin-bottom: 24px;
+  }
+  .bilgi { background: var(--yuzey-alt); color: var(--metin-orta); }
+  .hata { background: var(--vurgu-bg); color: var(--metin); }
+  .hata code {
+    display: block; margin-top: 10px; font-family: var(--mono);
+    font-size: 12px; color: var(--metin-orta);
+    background: var(--bg); padding: 9px 11px; border-radius: 6px;
+    overflow-x: auto; white-space: pre-wrap; word-break: break-word;
+  }
+  .yukleniyor { color: var(--metin-sol); font-size: 15px; }
+  .yukleniyor::after {
+    content: ""; animation: nokta 1.3s steps(4, end) infinite;
+  }
+  @keyframes nokta { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
+
+  footer {
+    margin-top: 64px; padding-top: 22px;
+    border-top: 1px solid var(--kenar-ince);
+    font-size: 12.5px; line-height: 1.6; color: var(--metin-sol);
+  }
+</style>
+</head>
+<body>
+<div class="kabuk">
+
+  <header>
+    <div class="marka">ai<span>bars</span></div>
+    <div class="durum"><span class="nokta bekle" id="nokta"></span><span id="durumMetni">hazırlanıyor</span></div>
+  </header>
+
+  <div class="arama">
+    <textarea id="soru" rows="1" placeholder="Bir soru sorun…"></textarea>
+    <button id="gonder" title="Sor">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+           stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
+    </button>
+  </div>
+
+  <div class="ornekler" id="ornekler"></div>
+
+  <div class="ayar-satiri">
+    <button id="ayarAc">Ayarlar</button>
+    <div id="ayarlar">
+      <label><input type="checkbox" id="cevapUret" checked> Cevap üret</label>
+      <label><input type="checkbox" id="mulgaHaric" checked> Yürürlükten kalkmışları gizle</label>
+      <label>Getirilecek madde
+        <select id="k"><option>5</option><option>8</option><option selected>10</option><option>15</option></select>
+      </label>
+    </div>
+  </div>
+
+  <div id="cikti"></div>
+
+  <footer>
+    Aibars genel bilgi verir, hukuki görüş yerine geçmez. Cevaplar yalnızca
+    indekslenmiş mevzuat metinlerine dayanır; içtihat ve doktrin içermez.
+    Karar dayanağı yapmadan önce bir avukata danışın.
+  </footer>
+
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const soruEl = $("#soru"), gonderEl = $("#gonder"), ciktiEl = $("#cikti");
+
+const ORNEKLER = [
+  "yıllık ücretli izin süresi kaç gündür",
+  "TBK 6. madde ne diyor",
+  "kişisel verilerin işlenme şartları nelerdir",
+];
+
+ORNEKLER.forEach(o => {
+  const b = document.createElement("button");
+  b.className = "ornek"; b.textContent = o;
+  b.onclick = () => { soruEl.value = o; boyutlandir(); sor(); };
+  $("#ornekler").appendChild(b);
+});
+
+$("#ayarAc").onclick = () => $("#ayarlar").classList.toggle("acik");
+
+function boyutlandir() {
+  soruEl.style.height = "auto";
+  soruEl.style.height = Math.min(soruEl.scrollHeight, 220) + "px";
+}
+soruEl.addEventListener("input", boyutlandir);
+soruEl.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sor(); }
+});
+gonderEl.onclick = sor;
+
+function kacis(s) {
+  const d = document.createElement("div");
+  d.textContent = s == null ? "" : String(s);
+  return d.innerHTML;
+}
+
+/* Indeks ve model ilk istekte yuklenir; bu 30 saniyeyi bulabilir.
+   Tek denemede vazgecip "indeks yok" demek yanlis bilgi veriyordu. */
+async function durumGuncelle(deneme = 0) {
+  try {
+    const r = await fetch("/api/durum");
+    const d = await r.json();
+    if (!d.hazir) throw new Error(d.hata || "hazır değil");
+    $("#nokta").className = "nokta acik";
+    $("#durumMetni").textContent =
+      d.madde_sayisi.toLocaleString("tr-TR") + " madde";
+  } catch (e) {
+    // Sunucunun acilisi 90 saniyeyi buluyor (model + 174 bin vektor).
+    // Onceki surum 20 x 3 sn = 60 saniye deneyip pes ediyordu, yani
+    // sunucu hazir olmadan once vazgeciyordu. Artik vazgecmiyor; aralik
+    // 3 saniyeden 10 saniyeye kadar aciliyor.
+    const bekleme = Math.min(3000 + deneme * 500, 10000);
+    $("#nokta").className = "nokta bekle";
+    $("#durumMetni").textContent =
+      deneme < 30 ? "hazırlanıyor" : "hazırlanıyor (uzun sürüyor)";
+    setTimeout(() => durumGuncelle(deneme + 1), bekleme);
+  }
+}
+
+async function sor() {
+  const soru = soruEl.value.trim();
+  if (!soru) return;
+
+  gonderEl.disabled = true;
+  ciktiEl.innerHTML = '<div class="yukleniyor">Mevzuat taranıyor</div>';
+
+  try {
+    const r = await fetch("/api/sor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        soru,
+        k: parseInt($("#k").value, 10),
+        mulga_haric: $("#mulgaHaric").checked,
+        cevap_uret: $("#cevapUret").checked,
+      }),
+    });
+    if (!r.ok) throw new Error("Sunucu " + r.status + " döndürdü");
+    ciz(await r.json());
+  } catch (e) {
+    ciktiEl.innerHTML = '<div class="hata">Sunucuya ulaşılamadı.<code>' +
+      kacis(e.message) + "</code></div>";
+  } finally {
+    gonderEl.disabled = false;
+  }
+}
+
+function ciz(d) {
+  let h = "";
+
+  if (d.cevap) {
+    h += '<div class="cevap">' + kacis(d.cevap) + "</div>";
+  } else if (d.cevap_hatasi) {
+    h += '<div class="hata">Maddeler bulundu, ancak cevap üretilemedi. ' +
+         "Yerel model henüz yüklü değilse bu beklenen bir durumdur.<code>" +
+         kacis(d.cevap_hatasi) + "</code></div>";
+  }
+
+  if (!d.maddeler.length) {
+    h += '<div class="bilgi">Bu soruya dayanak olabilecek bir madde bulunamadı. ' +
+         "Aranan konu indekslenmiş kanunların dışında olabilir.</div>";
+    ciktiEl.innerHTML = h;
+    return;
+  }
+
+  h += '<div class="bolum-basligi">Dayanak maddeler · ' +
+       d.maddeler.length + " madde</div>";
+
+  // Ayni kanunun maddeleri bir arada dursun: 10 sonuc duz liste halinde
+  // birbirine karisiyor, kanun basligi tekrar tekrar okunuyordu.
+  // Sadece art arda gelenleri gruplamak yetmiyor -- sonuclar siraya gore
+  // dagildigi icin ayni kanun birkac kez tekrar ediyordu. Kanuna gore tam
+  // gruplayip, gruplari en iyi siradaki uyelerine gore diziyoruz.
+  const harita = new Map();
+  d.maddeler.forEach((m, sira) => {
+    if (!harita.has(m.mevzuat_adi)) {
+      harita.set(m.mevzuat_adi, {
+        ad: m.mevzuat_adi, url: m.resmi_url, enIyi: sira, maddeler: [],
+      });
+    }
+    harita.get(m.mevzuat_adi).maddeler.push(m);
+  });
+  const gruplar = [...harita.values()].sort((a, b) => a.enIyi - b.enIyi);
+
+  gruplar.forEach(g => {
+    h += '<div class="grup"><div class="grup-basligi">' + kacis(g.ad) +
+      '<span class="grup-sayi">' + g.maddeler.length + " madde</span>" +
+      (g.url
+        ? '<a class="grup-kaynak" href="' + kacis(g.url) +
+          '" target="_blank" rel="noopener noreferrer">mevzuat.gov.tr ↗</a>'
+        : "") +
+      "</div>";
+
+    g.maddeler.forEach(m => {
+      let rozet = "";
+      if (m.mulga) rozet = '<span class="rozet">yürürlükte değil</span>';
+      else if (m.kismi_mulga) rozet = '<span class="rozet">kısmen değişik</span>';
+
+      h += '<div class="madde">' +
+        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+          '<span class="ok">▶</span>' +
+          '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
+          '<span class="madde-baslik">' +
+            kacis(m.baslik || "(başlıksız madde)") + "</span>" +
+          rozet +
+        "</div>" +
+        '<div class="madde-govde">' + kacis(m.metin) +
+          (m.bolum ? '<div class="madde-dip">' + kacis(m.bolum) + "</div>" : "") +
+        "</div></div>";
+    });
+    h += "</div>";
+  });
+
+  // Mahkeme kararlari AYRI bolumde. Maddelerle karistirilmamali: madde
+  // baglayici kural, karar ise o kuralin bir olaydaki yorumu.
+  if (d.kararlar && d.kararlar.length) {
+    h += '<div class="bolum-basligi">Mahkeme kararları · ' +
+         d.kararlar.length + " karar</div>";
+    h += '<div class="karar-not">Bu kararlar örnek niteliğindedir; ' +
+         "bağlayıcı kural yukarıdaki maddelerdir.</div>";
+    d.kararlar.forEach(kr => {
+      h += '<div class="karar">' +
+        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+          '<span class="ok">▶</span>' +
+          '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
+          (kr.karar_tarihi
+            ? '<span class="karar-tarih">' + kacis(kr.karar_tarihi) + "</span>"
+            : "") +
+        "</div>" +
+        '<div class="madde-govde">' + kacis(kr.metin) + "</div></div>";
+    });
+  }
+
+  ciktiEl.innerHTML = h;
+}
+
+durumGuncelle();
+soruEl.focus();
+</script>
+</body>
+</html>
