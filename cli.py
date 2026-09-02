@@ -38,11 +38,16 @@ def guvenli_yaz(yol, veri) -> None:
 
     os.replace ayni dizin icinde atomik: ya eski dosya ya yeni dosya
     gorunur, arada bos hal olmaz.
+
+    Yazim AKITILARAK yapiliyor: json.dumps once tum dosyayi tek parca
+    dizgi olarak bellekte kuruyor. 271 bin maddede bu ~800 MB ek bellek
+    demek ve cekim isi tam bu satirda MemoryError ile coktu (11.999.
+    belgede). json.dump ayni ciktiyi dogrudan dosyaya yaziyor.
     """
     import os
     gecici = yol.with_suffix(yol.suffix + ".tmp")
-    gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=1),
-                      encoding="utf-8")
+    with gecici.open("w", encoding="utf-8") as f:
+        json.dump(veri, f, ensure_ascii=False, indent=1)
     os.replace(gecici, yol)
 
 
