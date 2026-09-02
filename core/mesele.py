@@ -43,8 +43,11 @@ Kurallar:
 3. Her mesele KENDİ BAŞINA anlaşılmalı: hangi hukuk alanına ait olduğu
    satırdan anlaşılsın. "Savunma alma zorunluluğu" yerine "iş
    sözleşmesinin feshinde işçinin savunmasının alınması" yaz.
-4. Olayın kendi ayrıntılarını (süre, isim, tarih) yazma; hukuki kavramı yaz.
-5. Tek bir mesele varsa tek satır yaz."""
+4. Hukuk alanının adını sonuna etiket gibi ekleme; cümlenin içine yedir.
+   YANLIŞ: "işçinin savunmasının alınması zorunluluğu iş hukuku"
+   DOĞRU : "iş sözleşmesinin feshinde işçinin savunmasının alınması"
+5. Olayın kendi ayrıntılarını (süre, isim, tarih) yazma; hukuki kavramı yaz.
+6. Tek bir mesele varsa tek satır yaz."""
 
 ISTEM = """Olay: {soru}
 

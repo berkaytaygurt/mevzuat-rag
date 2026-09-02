@@ -22,10 +22,22 @@ def _script() -> str:
     return m.group(1)
 
 
+def _kod_satirlari() -> list[tuple[int, str]]:
+    """Yorum satirlari haric, numarali kod satirlari.
+
+    Bu dosyadaki denge sayimlari kaba: tirnak ve parantezleri sayiyor.
+    Turkce yorumlarda kesme isareti ("PDF'ten") ve dengesiz parantez
+    ('bent duzeyinde ("a)")') dogal olarak geciyor ve sahte alarm
+    uretiyordu. Denetlenmesi gereken KOD; duzyazi degil.
+    """
+    return [(i, s) for i, s in enumerate(_script().split("\n"), 1)
+            if not s.lstrip().startswith("//")]
+
+
 def test_tek_tirnakli_dizgide_kacissiz_tirnak_yok():
     """Tek tirnakli JS dizgisi icinde kacissiz ' varsa script cokuyor."""
     bozuk = []
-    for i, satir in enumerate(_script().split("\n"), 1):
+    for i, satir in _kod_satirlari():
         # Kacisli tirnaklari cikarip say: tek sayi kaliyorsa dizgi kapanmamis
         temiz = satir.replace("\\'", "")
         if temiz.count("'") % 2 == 1:
@@ -34,9 +46,9 @@ def test_tek_tirnakli_dizgide_kacissiz_tirnak_yok():
 
 
 def test_parantez_dengesi():
-    js = _script()
-    assert js.count("{") == js.count("}"), "suslu parantez dengesiz"
-    assert js.count("(") == js.count(")"), "parantez dengesiz"
+    kod = "\n".join(s for _, s in _kod_satirlari())
+    assert kod.count("{") == kod.count("}"), "suslu parantez dengesiz"
+    assert kod.count("(") == kod.count(")"), "parantez dengesiz"
 
 
 def test_toggle_cagrilari_kacisli():
@@ -89,3 +101,22 @@ def test_sor_olay_dinleyicisine_dogrudan_baglanmiyor():
 def test_sor_dizgi_olmayan_secileni_yok_sayiyor():
     js = _script()
     assert 'typeof secilen !== "string"' in js, "savunma kontrolu kayip"
+
+
+def test_karar_kartlari_acilabiliyor():
+    """Karar kartlari .karar sinifini tasiyor; acma kurali onu da kapsamali.
+
+    Kural yalnizca .madde icin yaziliydi: karara tiklaninca "acik" sinifi
+    ekleniyor ama hicbir CSS kurali eslesmedigi icin govde gizli kaliyordu.
+    Kararlar HIC acilmiyordu.
+    """
+    h = ARAYUZ.read_text(encoding="utf-8")
+    assert ".karar.acik .madde-govde" in h, "karar kartlari acilmiyor"
+    assert ".karar.acik .ok" in h
+
+
+def test_madde_metni_fikralara_bolunuyor():
+    js = _script()
+    assert "function fikralara" in js
+    # Ucu de fikra bolmeyi kullanmali: dayanak, karsi taraf, kararlar
+    assert js.count("fikralara(") >= 4, "fikra bolme her yerde kullanilmamis"
