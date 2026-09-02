@@ -322,9 +322,56 @@
     margin-bottom: 14px; padding: 8px 12px; font-size: 13.5px;
     border-left: 3px solid var(--vurgu); color: var(--metin-orta);
   }
-  .yukleniyor { color: var(--metin-sol); font-size: 15px; }
-  .yukleniyor::after {
+  [hidden] { display: none !important; }
+
+  /* Ipucu satiri: olculdu -- ayni mesele "olay anlatimi" olarak soruldugunda
+     dogru madde 5 soruda 1'inde 1. sirada, "hukuki kavram" olarak
+     soruldugunda 5'inde 5'inde. Bu farki kullaniciya soylemek bedava. */
+  .ipucu-satiri {
+    margin: 10px 2px 0; font-size: 12.5px; color: var(--metin-sol);
+    line-height: 1.6;
+  }
+  .ipucu-satiri b { color: var(--metin-orta); font-weight: 600; }
+
+  /* Sekmeler: cevap ustte sabit kalir, referans bolumleri sekmede.
+     Once hepsi tek sutunda alt alta duruyordu ve sonuc sayfasi
+     okunamayacak kadar uzuyordu (10 madde + 5 karsi madde + 3 karar). */
+  .sekmeler {
+    display: flex; flex-wrap: wrap; gap: 6px; margin: 30px 0 18px;
+    border-bottom: 1px solid var(--kenar-ince); padding-bottom: 10px;
+  }
+  .sekme {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 7px 13px; font-size: 13.5px; font-family: inherit;
+    border: 1px solid var(--kenar); border-radius: 999px; cursor: pointer;
+    background: none; color: var(--metin-orta);
+  }
+  .sekme:hover { border-color: var(--metin-sol); }
+  .sekme.secili {
+    background: var(--metin); color: var(--bg); border-color: var(--metin);
+  }
+  .sekme-sayi {
+    font-size: 11.5px; font-variant-numeric: tabular-nums;
+    opacity: .65;
+  }
+  /* Karsi taraf sekmesi ayirt edilsin. Renk "aleyhine" demiyor -- boyle bir
+     yorum hukuki tavsiye olur ve olculen dogruluk onu tasimaz; yalnizca
+     "bu bolum farkli bir sey gosteriyor" isareti. */
+  .sekme.dikkat { border-color: var(--uyari); color: var(--uyari); }
+  .sekme.dikkat.secili {
+    background: var(--uyari); color: var(--bg); border-color: var(--uyari);
+  }
+
+  .yukleniyor {
+    display: flex; align-items: baseline; gap: 10px;
+    color: var(--metin-sol); font-size: 15px;
+  }
+  .yuk-metin::after {
     content: ""; animation: nokta 1.3s steps(4, end) infinite;
+  }
+  .yuk-sure {
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+    color: var(--metin-sol); opacity: .7;
   }
   @keyframes nokta { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
 
@@ -352,6 +399,14 @@
   </div>
 
   <div class="ornekler" id="ornekler"></div>
+
+  <div class="ipucu-satiri">
+    <b>Olayı değil, meseleyi yazın.</b> Ölçüldü: aynı soru olay olarak
+    anlatıldığında doğru madde 5 sorudan 1'inde ilk sırada çıkıyor, hukuki
+    kavram olarak yazıldığında 5'inde 5'inde. Olayı yazarsanız sistem size
+    konu seçenekleri sunar. Madde numarasını biliyorsanız doğrudan yazın:
+    <b>TBK 344</b>, <b>4857 madde 19</b>.
+  </div>
 
   <div class="ayar-satiri">
     <button id="ayarAc">Ayarlar</button>
@@ -483,6 +538,24 @@ function cizNetlestirme(asil, meseleler) {
   });
 }
 
+// Bekleme ekrani. Asama adlari GERCEK: hangi istegin surdugunu biliyoruz.
+// Asama basina sure YAZILMIYOR -- cevap uretimi tek istek icinde bittigi
+// icin alt asamalarin suresi bilinmiyor ve uydurma sayi gostermek
+// kullaniciyi yaniltir. Onun yerine gercek gecen sure sayiyor.
+let _sayac = null;
+
+function yukleniyorGoster(metin) {
+  ciktiEl.innerHTML = '<div class="yukleniyor"><span class="yuk-metin">' +
+    kacis(metin) + '</span><span class="yuk-sure">0.0 sn</span></div>';
+  const bas = performance.now();
+  clearInterval(_sayac);
+  _sayac = setInterval(function () {
+    const el = ciktiEl.querySelector(".yuk-sure");
+    if (!el) { clearInterval(_sayac); return; }
+    el.textContent = ((performance.now() - bas) / 1000).toFixed(1) + " sn";
+  }, 100);
+}
+
 async function sor(secilen, netlestirmeyiAtla) {
   const asil = soruEl.value.trim();
   if (!asil) return;
@@ -491,16 +564,17 @@ async function sor(secilen, netlestirmeyiAtla) {
   gonderEl.disabled = true;
 
   if (!secilen && !netlestirmeyiAtla) {
-    ciktiEl.innerHTML = '<div class="yukleniyor">Sorunuz inceleniyor</div>';
+    yukleniyorGoster("Sorunuz inceleniyor");
     const n = await netlestir(asil);
     if (n && n.gerekli && n.meseleler.length > 1) {
+      clearInterval(_sayac);
       cizNetlestirme(asil, n.meseleler);
       gonderEl.disabled = false;
       return;
     }
   }
 
-  ciktiEl.innerHTML = '<div class="yukleniyor">Mevzuat taranıyor</div>';
+  yukleniyorGoster("Mevzuat taranıyor");
 
   try {
     const r = await fetch("/api/sor", {
@@ -528,6 +602,7 @@ async function sor(secilen, netlestirmeyiAtla) {
     ciktiEl.innerHTML = '<div class="hata">Sunucuya ulaşılamadı.<code>' +
       kacis(e.message) + "</code></div>";
   } finally {
+    clearInterval(_sayac);
     gonderEl.disabled = false;
   }
 }
@@ -646,9 +721,51 @@ function ciz(d) {
     return;
   }
 
-  h += '<div class="bolum-basligi">Dayanak maddeler · ' +
-       d.maddeler.length + " madde</div>";
+  // Referans bolumleri SEKMEDE. Onceden hepsi tek sutunda alt alta
+  // duruyordu: 10 dayanak maddesi + 5 karsi taraf maddesi + 3 karar,
+  // cevabin altinda kilometrelerce liste. Cevap ustte sabit kaliyor.
+  const paneller = [{ ad: "Dayanak maddeler", sayi: d.maddeler.length,
+                      icerik: dayanakPaneli(d) }];
 
+  const kt = d.karsi_taraf;
+  if (kt && kt.maddeler && kt.maddeler.length) {
+    paneller.push({ ad: "Buraya da dikkat", sayi: kt.maddeler.length,
+                    dikkat: true, icerik: karsiPaneli(kt) });
+  }
+  if (d.kararlar && d.kararlar.length) {
+    paneller.push({ ad: "Mahkeme kararları", sayi: d.kararlar.length,
+                    icerik: kararPaneli(d.kararlar) });
+  }
+
+  h += '<div class="sekmeler">';
+  paneller.forEach(function (p, i) {
+    h += '<button class="sekme' + (i === 0 ? " secili" : "") +
+      (p.dikkat ? " dikkat" : "") + '" data-panel="' + i + '">' +
+      kacis(p.ad) + '<span class="sekme-sayi">' + p.sayi + "</span></button>";
+  });
+  h += "</div>";
+  paneller.forEach(function (p, i) {
+    h += '<div class="panel" data-panel="' + i + '"' +
+      (i === 0 ? "" : " hidden") + ">" + p.icerik + "</div>";
+  });
+
+  ciktiEl.innerHTML = h;
+  ciktiEl.querySelectorAll(".sekme").forEach(function (b) {
+    b.addEventListener("click", function () { sekmeSec(b.dataset.panel); });
+  });
+}
+
+function sekmeSec(no) {
+  ciktiEl.querySelectorAll(".sekme").forEach(function (b) {
+    b.classList.toggle("secili", b.dataset.panel === no);
+  });
+  ciktiEl.querySelectorAll(".panel").forEach(function (p) {
+    p.hidden = p.dataset.panel !== no;
+  });
+}
+
+function dayanakPaneli(d) {
+  let h = "";
   // Ayni kanunun maddeleri bir arada dursun: 10 sonuc duz liste halinde
   // birbirine karisiyor, kanun basligi tekrar tekrar okunuyordu.
   // Sadece art arda gelenleri gruplamak yetmiyor -- sonuclar siraya gore
@@ -694,53 +811,47 @@ function ciz(d) {
     });
     h += "</div>";
   });
+  return h;
+}
 
-  // Karsi tarafin dayanabilecegi maddeler. Bilerek TAVSIYE VERILMIYOR:
-  // "zayif noktan su", "su argumani kullan" demek hukuki tavsiye olur ve
-  // sistemin olculen dogrulugu bunu tasimaz. Yalnizca "bunlara da bak".
-  const kt = d.karsi_taraf;
-  if (kt && kt.maddeler && kt.maddeler.length) {
-    h += '<div class="karsi-bolum"><div class="karsi-basligi">' +
-         "Buraya da dikkat edin · " + kt.maddeler.length + " madde</div>";
-    h += '<div class="karsi-not">Bu uyuşmazlıkta karşı tarafın ' +
-         "dayanabileceği düzenlemeler. Yorum yapılmadı, yalnızca " +
-         "listelendi.</div>";
-    h += '<div class="karsi">';
-    kt.maddeler.forEach(m => {
-      h += '<div class="madde">' +
-        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
-          '<span class="ok">▶</span>' +
-          '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
-          '<span class="madde-baslik">' +
-            kacis(m.mevzuat_adi) + (m.baslik ? " — " + kacis(m.baslik) : "") +
-          "</span></div>" +
-        '<div class="madde-govde">' + kacis(m.metin) + yorumlayanlar(m) +
-        "</div></div>";
-    });
-    h += "</div></div>";
-  }
+// Karsi tarafin dayanabilecegi maddeler. Bilerek TAVSIYE VERILMIYOR:
+// "zayif noktan su", "su argumani kullan" demek hukuki tavsiye olur ve
+// sistemin olculen dogrulugu bunu tasimaz. Yalnizca "bunlara da bak".
+function karsiPaneli(kt) {
+  let h = '<div class="karsi-not">Bu uyuşmazlıkta karşı tarafın ' +
+    "dayanabileceği düzenlemeler. Yorum yapılmadı, yalnızca listelendi.</div>" +
+    '<div class="karsi">';
+  kt.maddeler.forEach(function (m) {
+    h += '<div class="madde">' +
+      '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+        '<span class="ok">▶</span>' +
+        '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
+        '<span class="madde-baslik">' +
+          kacis(m.mevzuat_adi) + (m.baslik ? " — " + kacis(m.baslik) : "") +
+        "</span></div>" +
+      '<div class="madde-govde">' + kacis(m.metin) + yorumlayanlar(m) +
+      "</div></div>";
+  });
+  return h + "</div>";
+}
 
-  // Mahkeme kararlari AYRI bolumde. Maddelerle karistirilmamali: madde
-  // baglayici kural, karar ise o kuralin bir olaydaki yorumu.
-  if (d.kararlar && d.kararlar.length) {
-    h += '<div class="bolum-basligi">Mahkeme kararları · ' +
-         d.kararlar.length + " karar</div>";
-    h += '<div class="karar-not">Bu kararlar örnek niteliğindedir; ' +
-         "bağlayıcı kural yukarıdaki maddelerdir.</div>";
-    d.kararlar.forEach(kr => {
-      h += '<div class="karar">' +
-        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
-          '<span class="ok">▶</span>' +
-          '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
-          (kr.karar_tarihi
-            ? '<span class="karar-tarih">' + kacis(kr.karar_tarihi) + "</span>"
-            : "") +
-        "</div>" +
-        '<div class="madde-govde">' + kacis(kr.metin) + "</div></div>";
-    });
-  }
-
-  ciktiEl.innerHTML = h;
+// Mahkeme kararlari AYRI sekmede. Maddelerle karistirilmamali: madde
+// baglayici kural, karar ise o kuralin bir olaydaki yorumu.
+function kararPaneli(kararlar) {
+  let h = '<div class="karar-not">Bu kararlar örnek niteliğindedir; ' +
+    "bağlayıcı kural dayanak maddelerdir.</div>";
+  kararlar.forEach(function (kr) {
+    h += '<div class="karar">' +
+      '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+        '<span class="ok">▶</span>' +
+        '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
+        (kr.karar_tarihi
+          ? '<span class="karar-tarih">' + kacis(kr.karar_tarihi) + "</span>"
+          : "") +
+      "</div>" +
+      '<div class="madde-govde">' + kacis(kr.metin) + "</div></div>";
+  });
+  return h;
 }
 
 durumGuncelle();

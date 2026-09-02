@@ -51,3 +51,23 @@ def test_gerekli_fonksiyonlar_duruyor():
     for ad in ("ciz", "sor", "durumGuncelle", "maddeMetni",
                "yorumlayanlar", "dogrulamaKutusu"):
         assert f"function {ad}" in js or f"{ad} =" in js, f"{ad} kayip"
+
+
+def test_sekme_ve_panel_fonksiyonlari_var():
+    """Sonuc sayfasi sekmeli: cevap ustte sabit, referans bolumleri sekmede."""
+    js = _script()
+    for ad in ("sekmeSec", "dayanakPaneli", "karsiPaneli", "kararPaneli",
+               "yukleniyorGoster"):
+        assert f"function {ad}" in js, f"{ad} kayip"
+
+
+def test_panel_gorunurlugu_hidden_ile_yonetiliyor():
+    js = _script()
+    assert "p.hidden = p.dataset.panel !== no" in js
+
+
+def test_ciz_hala_tek_giris_noktasi():
+    """ciz() paneli kurup olay dinleyicilerini bagliyor."""
+    js = _script()
+    assert "function ciz(d)" in js
+    assert 'querySelectorAll(".sekme")' in js
