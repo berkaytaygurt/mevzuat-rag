@@ -420,7 +420,7 @@
     <button id="ayarAc">Ayarlar</button>
     <div id="ayarlar">
       <label><input type="checkbox" id="cevapUret" checked> Cevap üret</label>
-      <label title="Cross-encoder ile ilgili cümleyi işaretler; madde başına ~3 saniye ekler"><input type="checkbox" id="vurguAc"> İlgili cümleyi vurgula (yavaş)</label>
+      <label title="Cross-encoder ile ilgili cümleyi işaretler; madde başına ~1-3 saniye ekler"><input type="checkbox" id="vurguAc" checked> İlgili cümleyi vurgula (yavaşlatır)</label>
       <label><input type="checkbox" id="mulgaHaric" checked> Yürürlükten kalkmışları gizle</label>
       <label>Getirilecek madde
         <select id="k"><option>5</option><option>8</option><option selected>10</option><option>15</option></select>
@@ -681,12 +681,32 @@ function fikralara(metin) {
 function maddeMetni(m) {
   const p = m.parcalar;
   if (!p || !p.length) return fikralara(m.metin);
-  let vurguVar = false;
-  const govde = p.map(x => {
-    if (!x.vurgu) return kacis(x.metin);
-    vurguVar = true;
-    return '<mark class="vurgu">' + kacis(x.metin) + "</mark>";
-  }).join(" ");
+
+  // Vurgu acikken de fikralara bolunmeli. Once bolunmuyordu ve vurgu
+  // varsayilan acilinca duvar metni geri geliyordu: parcalar cumle
+  // gruplari, fikra siniri degil. Fikra basiyla baslayan parca yeni
+  // paragraf aciyor.
+  const FIKRA_BASI = /^\(\d{1,2}\)\s/;
+  let vurguVar = false, govde = "", acik = false;
+  p.forEach(function (x) {
+    const t = (x.metin || "").trim();
+    if (!t) return;
+    if (!acik || FIKRA_BASI.test(t)) {
+      if (acik) govde += "</p>";
+      govde += '<p class="fikra">';
+      acik = true;
+    } else {
+      govde += " ";
+    }
+    if (x.vurgu) {
+      vurguVar = true;
+      govde += '<mark class="vurgu">' + kacis(t) + "</mark>";
+    } else {
+      govde += kacis(t);
+    }
+  });
+  if (acik) govde += "</p>";
+
   return govde + (vurguVar
     ? '<div class="vurgu-not">İşaretli kısım sorunuzla doğrudan ilgili görünüyor.</div>'
     : "");

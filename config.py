@@ -183,7 +183,9 @@ GUVEN_ESIGI = float(os.getenv("GUVEN_ESIGI", "0.50"))
 # Isabet olculdu (10 soru): gomme benzerligiyle %60, cross-encoder ile %86.
 # Yani ozellik CALISIYOR, yalnizca pahali. Kullanici istedigi sorguda
 # acabilsin diye istek basina da verilebiliyor (Soru.vurgu).
-VURGU = os.getenv("VURGU", "0") not in ("0", "false", "hayir")
+# Varsayilan ACIK: kullanici istedi. Bedeli yukarida yazili --
+# madde basina ~1-3 saniye, 10 maddede sorguya 10-30 saniye ekliyor.
+VURGU = os.getenv("VURGU", "1") not in ("0", "false", "hayir")
 
 # Sorgu genisletme yalnizca ZAYIF sorgularda calissin. Ham sorgunun vektor
 # benzerligi bu degerin USTUNDEYSE genisletme atlanir.
