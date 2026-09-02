@@ -461,7 +461,10 @@ soruEl.addEventListener("input", boyutlandir);
 soruEl.addEventListener("keydown", e => {
   if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sor(); }
 });
-gonderEl.onclick = sor;
+// ARGUMANSIZ cagrilmali. "gonderEl.onclick = sor" yazilirsa tiklama olayi
+// birinci parametreye (secilen) dusuyor; o zaman netlestirme atlaniyor ve
+// sorgu olarak MouseEvent gonderiliyor -- sunucu 422 donuyor.
+gonderEl.onclick = function () { sor(); };
 
 function kacis(s) {
   const d = document.createElement("div");
@@ -557,6 +560,11 @@ function yukleniyorGoster(metin) {
 }
 
 async function sor(secilen, netlestirmeyiAtla) {
+  // Bir olay dinleyicisinden yanlislikla cagrilirsa secilen bir Event olur;
+  // o zaman sorgu olarak nesne gonderilir ve sunucu 422 doner. Dizgi
+  // olmayan her sey yok sayilir.
+  if (typeof secilen !== "string") secilen = null;
+
   const asil = soruEl.value.trim();
   if (!asil) return;
   const soru = secilen || asil;

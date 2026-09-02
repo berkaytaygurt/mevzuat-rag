@@ -71,3 +71,21 @@ def test_ciz_hala_tek_giris_noktasi():
     js = _script()
     assert "function ciz(d)" in js
     assert 'querySelectorAll(".sekme")' in js
+
+
+def test_sor_olay_dinleyicisine_dogrudan_baglanmiyor():
+    """sor() ARGUMANSIZ cagrilmali.
+
+    "gonderEl.onclick = sor" yazildiginda tiklama olayi birinci parametreye
+    (secilen) dusuyor, netlestirme atlaniyor ve sorgu olarak MouseEvent
+    gonderiliyordu; sunucu 422 donuyordu. Sitede boyle cikti.
+    """
+    js = _script()
+    assert "onclick = sor;" not in js, "sor dogrudan olaya baglanmis"
+    assert "addEventListener(\"click\", sor)" not in js
+    assert "gonderEl.onclick = function () { sor(); };" in js
+
+
+def test_sor_dizgi_olmayan_secileni_yok_sayiyor():
+    js = _script()
+    assert 'typeof secilen !== "string"' in js, "savunma kontrolu kayip"
