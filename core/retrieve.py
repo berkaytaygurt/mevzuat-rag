@@ -112,6 +112,7 @@ class Retriever:
         self.son_genisletme: str | None = None
         self.son_vektor_puani: float = 0.0
         self._ham_puan_sabit: float = 0.0
+        self.son_meseleler: list[str] = []
 
     @property
     def genisletici(self):
@@ -148,9 +149,23 @@ class Retriever:
             return
         tokenlar = [self._tokenize(self._kayit_metni(k)) for k in kayitlar]
         bm25 = BM25Okapi(tokenlar)
+        del tokenlar
         self.bm25_yol.parent.mkdir(parents=True, exist_ok=True)
-        with open(self.bm25_yol, "wb") as f:
-            pickle.dump({"bm25": bm25, "kayitlar": kayitlar}, f)
+
+        # Kayitlar pickle'a KONMUYOR: kayitlar.json'un birebir kopyasiydi
+        # (367 MB) ve pickle.dump 275 bin maddede MemoryError veriyordu.
+        # Yerine yalnizca sayi yaziliyor; okurken depodan gelen listeyle
+        # karsilastirilip hizalama dogrulaniyor.
+        #
+        # Yazim ATOMIK: onceki surumde dogrudan hedef dosyaya yaziliyordu ve
+        # dump ortasinda patlayinca bm25.pkl 599 MB'tan 69 MB'a dusup
+        # aramanin BM25 yarisini tumuyle bozdu.
+        import os
+        gecici = self.bm25_yol.with_suffix(self.bm25_yol.suffix + ".tmp")
+        with open(gecici, "wb") as f:
+            pickle.dump({"bm25": bm25, "kayit_sayisi": len(kayitlar)}, f,
+                        protocol=pickle.HIGHEST_PROTOCOL)
+        os.replace(gecici, self.bm25_yol)
         self._bm25, self._bm25_kayitlar = bm25, kayitlar
         log.info("BM25 indeksi kuruldu: %d madde", len(kayitlar))
 
@@ -159,7 +174,18 @@ class Retriever:
         if self._bm25 is None and self.bm25_yol.exists():
             with open(self.bm25_yol, "rb") as f:
                 d = pickle.load(f)
-            self._bm25, self._bm25_kayitlar = d["bm25"], d["kayitlar"]
+            kayitlar = d.get("kayitlar")        # eski bicim: liste iceride
+            if kayitlar is None:
+                kayitlar = self.store.tum_kayitlar()
+                # Hizalama sart: BM25 sirasi kayit sirasiyla ayni olmazsa
+                # arama calisir ama YANLIS maddeleri doner. Uyusmuyorsa
+                # BM25'i hic kullanmamak, sessizce sacmalamaktan iyidir.
+                if len(kayitlar) != d.get("kayit_sayisi"):
+                    log.error("BM25 indeksi kulliyatla uyusmuyor (%s vs %s); "
+                              "'python cli.py bm25' ile yeniden kurun",
+                              d.get("kayit_sayisi"), len(kayitlar))
+                    return None
+            self._bm25, self._bm25_kayitlar = d["bm25"], kayitlar
         return self._bm25
 
     @staticmethod
@@ -246,6 +272,16 @@ class Retriever:
             # Guclu sorguda genisletme atlanir: olculdu, genisletme sorgu
             # basina 4.09 saniye ekliyor ve zaten dogru maddeyi bulan bir
             # sorguda faydasi yok.
+            # Cok olgulu soru: meselelere ayirip her birini ayri ara.
+            # Tek vektor, olgularin bulanik ortalamasi oluyor ve hicbirinin
+            # maddesini bulamiyor -- olculdu, "isci 4 yil 11 ay calisti,
+            # devamsizlik nedeniyle savunma almadan feshetti" sorusunda
+            # sistem "dayanak bulamadim" dedi, oysa cevap m.19'daydi.
+            if config.MESELE_AYIR:
+                cok = self._mesele_araması(soru, limit, aday, mulga_haric)
+                if cok is not None:
+                    return cok
+
             if ham >= config.GENISLET_YETER:
                 return self._ara_bir_kez(soru, limit, aday, mulga_haric)
             genis = self.genisletici.genislet(soru)
@@ -272,6 +308,37 @@ class Retriever:
         yeni = self._ara_bir_kez(genis, limit, aday, mulga_haric)
         # Ikisinden hangisi daha guclu puanliysa o doner
         return yeni if self._en_iyi_puan(yeni) > self._en_iyi_puan(sonuc) else sonuc
+
+    def _mesele_araması(self, soru: str, limit: int, aday, mulga_haric):
+        """Cok olgulu soruyu meselelere ayirip birlestirilmis sonuc doner.
+
+        Ayrilamiyorsa None doner; cagiran taraf normal akisa devam eder.
+        """
+        from .mesele import cok_olgulu_mu, meseleleri_ayir
+
+        if not cok_olgulu_mu(soru):
+            return None
+        meseleler = meseleleri_ayir(soru, self.genisletici.uretici)
+        if not meseleler:
+            return None
+
+        self.son_meseleler = meseleler
+        log.debug("soru %d meseleye ayrildi: %s", len(meseleler), meseleler)
+
+        # Her mesele ayri aranip RRF ile birlestiriliyor. Ilk siradaki
+        # mesele biraz daha agir: genelde sorunun asil konusu.
+        birlesik: dict[str, dict] = {}
+        for i, m in enumerate(meseleler):
+            agirlik = 1.0 if i == 0 else 0.85
+            for rank, k in enumerate(self._ara_bir_kez(m, limit, aday, mulga_haric)):
+                cid = k.get("chunk_id")
+                if not cid:
+                    continue
+                g = birlesik.setdefault(cid, {"kayit": k, "skor": 0.0})
+                g["skor"] += agirlik / (60 + rank)
+
+        sirali = sorted(birlesik.values(), key=lambda x: -x["skor"])
+        return [{**g["kayit"], "skor": g["skor"]} for g in sirali[:limit]]
 
     @staticmethod
     def _en_iyi_puan(sonuc: list[dict]) -> float:

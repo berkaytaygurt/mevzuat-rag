@@ -73,11 +73,15 @@
   /* ---------- arama ---------- */
   .arama { position: relative; }
   #soru {
-    width: 100%; padding: 18px 60px 18px 20px;
+    width: 100%; padding: 18px 64px 18px 20px;
     font-family: var(--sans); font-size: 17px; color: var(--metin);
     background: var(--yuzey); border: 1px solid var(--kenar);
     border-radius: 14px; resize: none; min-height: 60px; max-height: 220px;
-    overflow-y: auto; line-height: 1.5;
+    /* hidden: kutu icerige gore buyudugu icin kaydirma cubuguna gerek yok.
+       auto birakildiginda cubuk cikip gonder tusunun ustune biniyordu.
+       Yalnizca max-height'a ulasinca (JS ile) auto'ya cevriliyor. */
+    overflow-y: hidden; line-height: 1.5; display: block;
+    box-sizing: border-box; scrollbar-width: thin;
     transition: border-color .15s, box-shadow .15s;
   }
   #soru:focus {
@@ -86,8 +90,9 @@
   }
   #soru::placeholder { color: var(--metin-sol); }
   #gonder {
-    position: absolute; right: 11px; bottom: 11px;
-    width: 38px; height: 38px; display: grid; place-items: center;
+    position: absolute; right: 10px; bottom: 10px;
+    width: 40px; height: 40px; display: grid; place-items: center;
+    flex: none; z-index: 2;
     color: #fff; background: var(--vurgu); border: none;
     border-radius: 10px; cursor: pointer; transition: opacity .15s;
   }
@@ -370,7 +375,11 @@ $("#ayarAc").onclick = () => $("#ayarlar").classList.toggle("acik");
 
 function boyutlandir() {
   soruEl.style.height = "auto";
-  soruEl.style.height = Math.min(soruEl.scrollHeight, 220) + "px";
+  const h = soruEl.scrollHeight;
+  soruEl.style.height = Math.min(h, 220) + "px";
+  // Kaydirma cubugu yalnizca tavana ulasinca cikar; aksi halde cubuk
+  // gonder tusunun ustune biniyor ve kutu bozuk gorunuyor.
+  soruEl.style.overflowY = h > 220 ? "auto" : "hidden";
 }
 soruEl.addEventListener("input", boyutlandir);
 soruEl.addEventListener("keydown", e => {

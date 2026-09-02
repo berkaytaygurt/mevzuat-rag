@@ -12,11 +12,18 @@ from __future__ import annotations
 
 import io
 import re
+from collections import Counter
 from dataclasses import dataclass, asdict, field
 
-# "Madde 1 -", "MADDE 12 –", "Ek Madde 3 -", "Gecici Madde 2 -"
+# "Madde 1 -", "MADDE 12 –", "Ek Madde 3 -", "Gecici Madde 2 -", "Madde 3/A-"
+#
+# Harf ekli maddeler ayri hukumdur ve avukat onlari "2576 m.3/A" diye anar.
+# Harf yakalanmazken hepsi ayni numaraya dusuyor, ayristirici da cakismayi
+# "3 (2)", "3 (9)" diye ciftliyordu -- kimsenin arayamayacagi bir ad. Bu
+# durumdaki madde sayisi olculdu: 1.740 (374'u kanunlarda).
 MADDE_RE = re.compile(
-    r"^\s*(?P<tip>Ek|Geçici|Gecici|Mükerrer|Mukerrer)?\s*Madde\s+(?P<no>\d+)\s*[-–—]?\s*",
+    r"^\s*(?P<tip>Ek|Geçici|Gecici|Mükerrer|Mukerrer)?\s*Madde\s+(?P<no>\d+)"
+    r"(?:\s*/\s*(?P<harf>[A-ZÇĞİÖŞÜ]))?\s*[-–—]?\s*",
     re.IGNORECASE,
 )
 BOLUM_RE = re.compile(
@@ -59,7 +66,7 @@ class Madde:
         # Erdirilmesi"). Tertipsiz id'de maddeleri cakisip birbirini eziyor;
         # tam kulliyatta 104 madde bu yuzden indekse hic girmemisti.
         return (f"{self.mevzuat_tur}-{self.mevzuat_no}-{self.tertip}-{self.madde_no}"
-                .replace(" ", "_"))
+                .replace(" ", "_").replace("/", "_"))
 
     def to_embed_text(self) -> str:
         """Embedding'e verilecek metin. Kanun adi ve baslik da dahil ki
@@ -112,8 +119,40 @@ def _baslik_olabilir(satir: str) -> bool:
 # --------------------------------------------------------------------------
 # Kaynaklardan blok listesi
 # --------------------------------------------------------------------------
+# Sayfa alti dipnotlari govde metninden kucuk punto ile diziliyor. Olculdu
+# (4857 sayili Is Kanunu): govde 12.0 punto / 2024 satir, dipnot 11.0 punto /
+# 117 satir -- ayrim kesin, tek istisna yok.
+#
+# Bu ayrimi kullanmak SART, cunku dipnot sayfa altinda maddenin IKI FIKRASI
+# ARASINA dusuyor. Eski ayristirici dipnotu madde siniri sayip maddeyi orada
+# kapatiyordu ve kalan fikralar tumuyle kayboluyordu: 4857 m.19 kulliyata
+# 112 karakter olarak girmisti, "savunmasini almadan ... feshedilemez"
+# fikrasi hic yoktu.
+DIPNOT_PUNTO_PAYI = 0.4
+
+
+def _pdf_satir_puntolari(pdf_baytlari: bytes) -> list[tuple[float, str]]:
+    """PyMuPDF ile (punto, satir) ciftleri.
+
+    Satirin puntosu icindeki EN BUYUK span'dir; boylece govde satirinin
+    sonundaki ust-simge dipnot isareti satiri kucuk gostermez.
+    """
+    import pymupdf
+
+    ciftler: list[tuple[float, str]] = []
+    with pymupdf.open(stream=pdf_baytlari, filetype="pdf") as belge:
+        for sayfa in belge:
+            for blok in sayfa.get_text("dict")["blocks"]:
+                for satir in blok.get("lines", []):
+                    spanlar = satir.get("spans") or []
+                    metin = _clean("".join(s["text"] for s in spanlar))
+                    if metin and spanlar:
+                        ciftler.append((max(s["size"] for s in spanlar), metin))
+    return ciftler
+
+
 def bloklar_pdf(pdf_baytlari: bytes) -> list[str]:
-    """PDF -> satir listesi.
+    """PDF -> satir listesi, sayfa alti dipnotlari ayiklanmis halde.
 
     Birincil cikarici PyMuPDF. pypdf bu belgelerde kelime ortasina bosluk
     sokuyor ("s ozlesmenin", "as ilanmasi v e nak li"): TMK'de her bin
@@ -122,17 +161,22 @@ def bloklar_pdf(pdf_baytlari: bytes) -> list[str]:
     eslesmesini dogrudan kaybettirdigi icin bu fark onemli.
     """
     try:
-        import pymupdf
-
-        with pymupdf.open(stream=pdf_baytlari, filetype="pdf") as belge:
-            ham_metin = "\n".join(sayfa.get_text() for sayfa in belge)
+        satirlar = _pdf_satir_puntolari(pdf_baytlari)
     except ImportError:
         from pypdf import PdfReader
 
         reader = PdfReader(io.BytesIO(pdf_baytlari))
-        ham_metin = "\n".join((s.extract_text() or "") for s in reader.pages)
+        ham = "\n".join((s.extract_text() or "") for s in reader.pages)
+        return [t for h in ham.split("\n") if (t := _clean(h))]
 
-    return [satir for ham in ham_metin.split("\n") if (satir := _clean(ham))]
+    if not satirlar:
+        return []
+    # Govde puntosu = en cok satirda kullanilan punto. Baslik satirlari
+    # govdeden BUYUK oldugu icin bu esikte kalir; yalnizca kucuk punto
+    # (dipnot) duser.
+    govde_punto = Counter(p for p, _ in satirlar).most_common(1)[0][0]
+    esik = govde_punto - DIPNOT_PUNTO_PAYI
+    return [t for p, t in satirlar if p >= esik]
 
 
 def bloklar_html(html: str) -> list[str]:
@@ -226,6 +270,7 @@ def maddeleri_cikar(bloklar: list[str], *, tur_adi: str = "Kanun",
     tert = tertip or meta["tertip"]
 
     maddeler: list[Madde] = []
+    dipnot_modu = False
     bolum = ""
     current: Madde | None = None
     govde: list[str] = []
@@ -246,9 +291,20 @@ def maddeleri_cikar(bloklar: list[str], *, tur_adi: str = "Kanun",
         if SON_RE.search(blok):
             flush()
             break
+        # Dipnot madde SINIRI DEGIL. Burada eskiden flush() vardi; dipnot
+        # sayfa altinda iki fikra arasina dustugu icin maddenin geri kalani
+        # cope gidiyordu. PDF yolunda dipnotlar zaten punto farkiyla
+        # ayiklaniyor -- bu dal HTML yolu ve punto ayrimi tasimayan
+        # belgeler icin yedek.
         if DIPNOT_RE.match(blok):
-            flush()
+            dipnot_modu = not blok.rstrip().endswith((".", "!", "?"))
             continue
+        if dipnot_modu:
+            if MADDE_RE.match(blok) or BOLUM_RE.match(blok):
+                dipnot_modu = False      # dipnot kapanmadan yeni madde geldi
+            else:
+                dipnot_modu = not blok.rstrip().endswith((".", "!", "?"))
+                continue
 
         if BOLUM_RE.match(blok):
             flush()
@@ -257,13 +313,28 @@ def maddeleri_cikar(bloklar: list[str], *, tur_adi: str = "Kanun",
             continue
 
         if m := MADDE_RE.match(blok):
+            onceki = bloklar[i - 1] if i > 0 else ""
+            baslik = onceki if _baslik_olabilir(onceki) else ""
+            # Baslik satiri bir onceki dongude onceki maddenin govdesine de
+            # eklenmisti. Cikarilmazsa her maddenin metni BIR SONRAKI
+            # maddenin basligiyla bitiyor (4857 m.19 "... saklidir. Fesih
+            # bildirimine itiraz ve usulu" diye bitiyordu).
+            #
+            # Ama _baslik_olabilir kesin bir olcut degil: 6518 m.101'in
+            # gercek son satiri "... yerine islenmistir.)" de baslik
+            # goruntusu veriyor ve cikarilinca METIN KAYBEDIYORUZ. Bu yuzden
+            # yalnizca bir onceki satir cumleyi bitirmisse -- yani govde
+            # gercekten kapanmis, sonrasi ayri bir satir olarak duruyorsa --
+            # cikariyoruz.
+            onun_oncesi = bloklar[i - 2].rstrip() if i >= 2 else ""
+            if (baslik and len(govde) > 1 and govde[-1] == onceki
+                    and onun_oncesi.endswith((".", ")", "!", "?"))):
+                govde.pop()
             flush()
             tip = (m.group("tip") or "").strip().title()
             tip = {"Gecici": "Geçici", "Mukerrer": "Mükerrer"}.get(tip, tip)
-            madde_no = f"{tip} {m.group('no')}".strip()
-
-            onceki = bloklar[i - 1] if i > 0 else ""
-            baslik = onceki if _baslik_olabilir(onceki) else ""
+            harf = (m.group("harf") or "").upper()
+            madde_no = f"{tip} {m.group('no')}".strip() + (f"/{harf}" if harf else "")
             # "1. Onemli sebepler2" -> sondaki dipnot rakamini at
             baslik = re.sub(r"(?<=[A-ZÇĞİÖŞÜa-zçğıöşü])\d{1,3}$", "", baslik).strip()
 

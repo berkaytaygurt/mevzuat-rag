@@ -99,8 +99,16 @@ def cmd_cek(args) -> None:
             mevcut[m["chunk_id"]] = m
         log.info("mevcut %d madde korunuyor", len(mevcut))
 
+    # Bu calismada yeniden ayristirilan belgeler. Eski kayitlari atilmali:
+    # ayristirici duzelince madde numaralari degisebiliyor ("3 (2)" -> "3/A")
+    # ve yalnizca chunk_id uzerinden birlestirirsek eski HATALI kayit da
+    # kulliyatta kaliyor; ayni hukum iki kez, biri bozuk halde gorunuyor.
+    yenilenen: set[tuple] = set()
+
     def kaydet(yeniler: list[dict]) -> None:
-        birlesik = dict(mevcut)
+        birlesik = {cid: m for cid, m in mevcut.items()
+                    if (m["mevzuat_no"], m["tertip"], m["mevzuat_tur"])
+                    not in yenilenen}
         for m in yeniler:
             birlesik[m["chunk_id"]] = m
         guvenli_yaz(MADDE_YOLU, list(birlesik.values()))
@@ -115,10 +123,14 @@ def cmd_cek(args) -> None:
 
     tum_maddeler, basarisiz = [], []
     for i, (no, tur, tertip, ad, pdf_url, metinsiz) in enumerate(hedefler, 1):
-        # Tum kulliyat ~40 dakika suruyor. Sadece sonda kaydedersek 900. kanunda
-        # olusan bir hata butun isi cope atar; araligi kacirmamak icin arada
-        # diske yaziyoruz. PDF'ler zaten onbellekte, tekrar calistirmak ucuz.
-        if i % 50 == 0:
+        # Sadece sonda kaydedersek 900. belgede olusan bir hata butun isi cope
+        # atar; arada diske yaziyoruz. Aralik 400: dosya 375 MB ve her yazim
+        # tam yeniden yazim demek -- 50'de bir yazarken tur suzgecli bir
+        # calisma 80 GB'lik gereksiz disk yazimi cikariyordu.
+        # Yalnizca yeni madde varken yaz. Tur suzgeciyle calisirken (or.
+        # --yenile-tur 1) dongu 14.439 belgenin cogunu atliyor; kosulsuz
+        # yazarsak her 50 atlamada 375 MB'lik dosya bosuna yeniden yaziliyor.
+        if i % 400 == 0 and tum_maddeler:
             kaydet(tum_maddeler)
             log.info("--- ara kayit: %d kanun islendi, %d madde ---",
                      i, len(tum_maddeler))
@@ -144,6 +156,7 @@ def cmd_cek(args) -> None:
                 if len(basarisiz) % 50 == 0:
                     log.warning("madde uretmeyen belge sayisi: %d", len(basarisiz))
                 continue
+            yenilenen.add((no, tertip, tur_adi))
             tum_maddeler.extend(m.to_dict() for m in maddeler)
             log.info("[%d/%d] %s (%s): %d madde [%s]", i, len(hedefler), no,
                      maddeler[0].mevzuat_adi[:40], len(maddeler), kaynak)
@@ -272,7 +285,25 @@ def cmd_karar_indeksle(args) -> None:
     log.info("karar indeksi hazir: %d parca -> %s", len(parcalar), KARAR_INDEX_DIR)
 
 
+def cmd_bm25(args) -> None:
+    """Yalnizca BM25 indeksini yeniden kurar.
+
+    Gomme saatler suruyor; BM25 dakikalar. Ikisini ayirmak sart cunku BM25
+    adimi bellek yuzunden ayrica cokebiliyor ve o zaman gommeyi bastan
+    yapmak sacma olur.
+    """
+    from core.embedder import Embedder
+    from core.retrieve import Retriever
+    from core.vektor import VektorDeposu
+
+    store = VektorDeposu()
+    # Embedder modeli tembel yukluyor; BM25 icin GPU'ya hic gidilmez.
+    Retriever(store, Embedder()).bm25_kur()
+
+
 def cmd_indeksle(args) -> None:
+    import gc
+
     from core.embedder import Embedder
     from core.retrieve import Retriever
 
@@ -281,10 +312,27 @@ def cmd_indeksle(args) -> None:
     maddeler = json.loads(MADDE_YOLU.read_text(encoding="utf-8"))
     log.info("%d madde yuklendi", len(maddeler))
 
-    emb = Embedder()
     metinler = [_embed_metni(m) for m in maddeler]
-    log.info("embedding basliyor (cihaz: %s)...", emb.device)
-    vektorler = emb.encode_documents(metinler)
+
+    # Degismeyen maddeyi yeniden gommek gereksiz. 275 bin maddeyi bastan
+    # gommek RTX 3050'de saatler suruyor, oysa bir ayristirici duzeltmesi
+    # tipik olarak maddelerin kucuk bir bolumunu degistiriyor. Anahtar
+    # embed metninin KENDISI: madde numarasi degisse bile metin ayniysa
+    # onceki vektor gecerlidir.
+    satirlar, maske = (None, None) if args.tam else _onceki_vektorler(metinler)
+
+    emb = Embedder()
+    if maske is not None and maske.any():
+        eksik = [j for j in range(len(metinler)) if not maske[j]]
+        log.info("degismeyen %d madde onceki indeksten alindi, %d madde gomulecek",
+                 int(maske.sum()), len(eksik))
+        if eksik:
+            log.info("embedding basliyor (cihaz: %s)...", emb.device)
+            satirlar[eksik] = emb.encode_documents([metinler[j] for j in eksik])
+        vektorler = satirlar
+    else:
+        log.info("embedding basliyor (cihaz: %s)...", emb.device)
+        vektorler = emb.encode_documents(metinler)
     log.info("embedding bitti: %s", vektorler.shape)
 
     # Vektorler normalize edilir: kosinus benzerligi tek matris carpimina
@@ -298,11 +346,50 @@ def cmd_indeksle(args) -> None:
     store = VektorDeposu()
     store.kaydet(maddeler, vektorler / norm)
 
-    Retriever(store, emb).bm25_kur()
-
     from core.yazim import sozluk_kur
     sozluk_kur(maddeler)
+
+    # BM25 kurulumu 275 bin dokumanda bellegin tepesini zorluyor. Buyuk
+    # dizileri once birakiyoruz: onceki calismada pickle.dump MemoryError
+    # verdi ve yarim yazilan bm25.pkl aramanin BM25 yarisini tumuyle bozdu.
+    del vektorler, satirlar, maddeler, metinler, norm
+    gc.collect()
+
+    Retriever(store, emb).bm25_kur()
     log.info("indeks hazir: %d madde", store.sayi())
+
+
+def _onceki_vektorler(metinler: list[str]):
+    """Onceki indeksten, embed metni degismemis maddelerin vektorunu getirir.
+
+    Doner: (matris, maske). Maske True olan satirlar dolu; False olanlar
+    yeniden gomulecek. Onceki indeks yoksa (None, None) doner.
+    """
+    import numpy as np
+
+    vyol = config.INDEX_DIR / "vektorler.npy"
+    kyol = config.INDEX_DIR / "kayitlar.json"
+    if not (vyol.exists() and kyol.exists()):
+        return None, None
+    eski_kayit = json.loads(kyol.read_text(encoding="utf-8"))
+    eski_vek = np.load(vyol)
+    if len(eski_kayit) != len(eski_vek):
+        log.warning("onceki indeks tutarsiz, bastan gomulecek")
+        return None, None
+
+    dizin: dict[str, int] = {}
+    for i, kayit in enumerate(eski_kayit):
+        dizin.setdefault(_embed_metni(kayit), i)
+    del eski_kayit          # 275 bin kayitlik liste; vektor matrisi zaten 1.1 GB
+
+    satirlar = np.zeros((len(metinler), eski_vek.shape[1]), dtype=np.float32)
+    maske = np.zeros(len(metinler), dtype=bool)
+    for j, metin in enumerate(metinler):
+        i = dizin.get(metin)
+        if i is not None:
+            satirlar[j] = eski_vek[i]
+            maske[j] = True
+    return satirlar, maske
 
 
 def _embed_metni(m: dict) -> str:
@@ -358,7 +445,12 @@ def main() -> None:
     b.set_defaults(func=cmd_cek)
 
     c = alt.add_parser("indeksle", help="GPU'da embed et, Qdrant + BM25 kur")
+    c.add_argument("--tam", action="store_true",
+                   help="degismeyenleri de yeniden gom (varsayilan: artimli)")
     c.set_defaults(func=cmd_indeksle)
+
+    cb = alt.add_parser("bm25", help="yalnizca BM25 indeksini yeniden kur")
+    cb.set_defaults(func=cmd_bm25)
 
     ki = alt.add_parser("karar-indeksle", help="kararlari ayri indekse yaz")
     ki.set_defaults(func=cmd_karar_indeksle)

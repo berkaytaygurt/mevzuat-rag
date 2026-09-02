@@ -321,6 +321,103 @@ eksik olabilir. `cek --yenile-tur 7 8 9` bunları PDF'ten yeniden çeker.
 sonrası vazgeçiliyordu; kalıcı bir sınır sanılmıştı. Deneme sayısı 8'e,
 sayfa boyu 50'ye çekilince üç tür de eksiksiz geldi (10.164 → 14.439 belge).
 
+## Madde metinleri kesiliyordu (02.09.2026'da çözüldü)
+
+Bir avukat sorusu bunu ortaya çıkardı: *"işçi 4 yıl 11 ay çalıştı, işveren
+devamsızlık nedeniyle savunma almadan feshetti, fesih geçerli mi"*. Sistem
+dayanak bulamadı. Beklenen cevap İş Kanunu m.19'du ve madde indekste vardı —
+ama **112 karakter** olarak. Maddenin ikinci fıkrası ("Hakkındaki iddialara
+karşı savunmasını almadan ... feshedilemez"), yani işe iade davalarının
+dayandığı hüküm, külliyatta hiç yoktu. "savunmas" kelimesi 4857 sayılı
+Kanun'un tamamında geçmiyordu.
+
+Üç ayrı hata çıktı.
+
+**1. Sayfa altı dipnotu maddeyi kesiyordu.** PDF'te dipnot, maddenin iki
+fıkrası *arasına* düşüyor. Ayrıştırıcı dipnot satırını görünce `flush()`
+çağırıp maddeyi kapatıyor, sonraki fıkralar `current is None` olduğu için
+sessizce çöpe gidiyordu:
+
+```
+Madde 19 - İşveren fesih bildirimini yazılı olarak yapmak ve ...
+kesin bir şekilde belirtmek zorundadır.
+6 18/2/2009 tarihli ve 5838 sayılı Kanunun 32 nci maddesiyle; ...   ← dipnot
+Hakkındaki iddialara karşı savunmasını almadan bir işçinin ...      ← kayıp
+```
+
+Dipnotlar gövdeden küçük punto ile diziliyor ve ayrım kesin — ölçüldü (4857):
+gövde 12,0 punto / 2.024 satır, dipnot 11,0 punto / 117 satır, istisna yok.
+Artık `bloklar_pdf` satırların puntosunu PyMuPDF'ten okuyor ve en çok
+kullanılan puntonun altındakileri atıyor. Madde kesilmiyor.
+
+**2. Dipnot metni gövdeye sızıyordu.** Eski kod dipnotun yalnızca ilk
+satırını tanıyordu; devam satırları madde metnine yapışıyordu:
+
+```
+ESKİ: "Bu Kanun hükümlerini Bakanlar Kurulu yürütür 5 Bu maddede geçen
+       '...belediyeler...' sözcüğü; Anayasa Mahkemesinin 27/6/1995 tarih ve
+       E.1994/90 sayılı kararıyla iptal edilmiştir."
+YENİ: "Bu Kanun hükümlerini Bakanlar Kurulu yürütür"
+```
+
+**3. `Madde 3/A` diye bir madde yoktu.** Harf eki yakalanmıyordu; harfli
+maddeler numarayı kaybedip aynı numaraya düşüyor, çakışma da `3 (2)`, `3 (9)`
+diye çözülüyordu — kimsenin arayamayacağı bir ad. 1.740 madde bu durumdaydı.
+
+Ayrıca her maddenin metni bir *sonraki* maddenin başlığıyla bitiyordu
+(`"... saklıdır. Fesih bildirimine itiraz ve usulü"`). Başlık satırı hem
+başlık olarak alınıp hem gövdeye ekleniyordu. Temizlik korumalı yapıldı:
+başlık sezgisi kesin değil (`"... yerine işlenmiştir.)"` de başlık görünüyor)
+ve korumasız silmek gerçek metin kaybettiriyordu.
+
+### Ölçülen sonuç
+
+Kanunlar yeniden çekildi (907 belge). Metin hacmi:
+
+| | önce | sonra |
+|---|---|---|
+| Kanun maddesi | 33.742 | 33.827 |
+| Toplam karakter | 21.744.385 | **25.742.496** (%+18,4) |
+| Doğru numaralanmış harfli madde | 0 | 472 |
+| İş Kanunu m.19 | 112 karakter | 363 karakter |
+
+Aynı 34 soruluk set, aynı ayarlarla iki külliyat üzerinde koşuldu (eski
+külliyat ayrı bir indekse kurulup ölçüldü):
+
+| | eski külliyat | yeni külliyat |
+|---|---|---|
+| 1. sırada | 14/34 (%41) | **23/34 (%68)** |
+| ilk 3'te | 20/34 | **26/34** |
+| ilk 5'te | 24/34 (%71) | **29/34 (%85)** |
+| MRR | 0,524 | **0,748** |
+
+14 soru iyileşti, 3 soru birer sıra geriledi (3→5, 5→6, 5→6). Daha önce hiç
+bulunamayan 5 soru artık bulunuyor. Sorunu ortaya çıkaran avukat sorusu m.19'u
+4. sırada getiriyor — mesele ayırma kapalıyken.
+
+Regresyon testleri: `tests/test_dipnot.py`.
+
+**Kalan iş:** tebliğ ve yönetmelikler henüz yeniden çekilmedi (10.781 belge);
+onların metinlerinde dipnot kirliliği duruyor.
+
+### Artımlı indeksleme
+
+Bu ölçüm ancak indeksleme artımlı hale getirildiği için yapılabildi.
+275.891 maddeyi baştan gömmek RTX 3050'de ~6,8 saat sürüyor; oysa bir
+ayrıştırıcı düzeltmesi maddelerin küçük bir bölümünü değiştiriyor. Artık
+embed metni değişmeyen maddenin vektörü önceki indeksten alınıyor
+(`cli._onceki_vektorler`): 252.541 madde yeniden kullanıldı, 23.350 madde
+gömüldü, süre **35 dakikaya** indi. Eşleme sıraya değil metnin kendisine
+dayanıyor; yanlış eşleme sessizce saçmalatacağı için `tests/test_artimli_indeks.py`
+ile sabitlendi. `indeksle --tam` eski davranışı verir.
+
+BM25 adımında iki kusur bu sırada ortaya çıktı ve düzeltildi: `pickle.dump`
+275 bin maddede `MemoryError` veriyordu (kayıtların tam kopyasını da
+yazdığı için) ve doğrudan hedef dosyaya yazdığı için çökünce `bm25.pkl`
+599 MB'tan 69 MB'a düşüp aramanın BM25 yarısını bozuyordu. Artık kayıt
+kopyası yazılmıyor (267 MB), yazım atomik ve `cli.py bm25` yalnızca bu adımı
+yeniden kurabiliyor.
+
 ## Mahkeme kararları
 
 Kararlar **ayrı bir indekste** tutulur (`data/index_karar`). Tek indekste

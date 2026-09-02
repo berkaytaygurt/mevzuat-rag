@@ -196,3 +196,10 @@ VURGU = os.getenv("VURGU", "0") not in ("0", "false", "hayir")
 # Gercek soru puanlarinin ortancasi 0.701; 0.72 esigi sorgularin yaklasik
 # yarisini genisletmeden gecirir.
 GENISLET_YETER = float(os.getenv("GENISLET_YETER", "0.72"))
+
+# Cok olgulu sorulari hukuki meselelere ayirip her birini ayri arama.
+# Olculen sorun: avukat somut dosyayla gelir ("isci 4 yil 11 ay calisti,
+# devamsizlik nedeniyle savunma almadan feshetti, fesih gecerli mi") ve tek
+# vektor bu uc meselenin bulanik ortalamasi oluyor; sistem hicbirinin
+# maddesini bulamayip "dayanak bulamadim" diyordu.
+MESELE_AYIR = os.getenv("MESELE_AYIR", "1") not in ("0", "false", "hayir")
