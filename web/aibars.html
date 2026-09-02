@@ -301,6 +301,27 @@
     background: var(--bg); padding: 9px 11px; border-radius: 6px;
     overflow-x: auto; white-space: pre-wrap; word-break: break-word;
   }
+  /* Netlestirme: olay anlatimini mesele basliklarina cevirip sectiriyor */
+  .netlestir { border: 1px solid var(--kenar); border-radius: 10px;
+               padding: 18px 20px; background: var(--yuzey); }
+  .netlestir h3 { margin: 0 0 6px; font-size: 16px; }
+  .netlestir .ipucu { margin: 0 0 14px; color: var(--metin-orta); font-size: 14px; }
+  .secenekler { display: flex; flex-direction: column; gap: 8px; }
+  .mesele {
+    text-align: left; padding: 11px 14px; font-size: 14.5px; line-height: 1.45;
+    border: 1px solid var(--kenar); border-radius: 8px; cursor: pointer;
+    background: var(--yuzey-alt); color: var(--metin); font-family: inherit;
+  }
+  .mesele:hover { border-color: var(--vurgu); background: var(--vurgu-bg); }
+  .dogrudan {
+    margin-top: 14px; padding: 8px 12px; font-size: 13.5px; cursor: pointer;
+    border: 0; background: none; color: var(--metin-sol);
+    text-decoration: underline; font-family: inherit;
+  }
+  .secilenMesele {
+    margin-bottom: 14px; padding: 8px 12px; font-size: 13.5px;
+    border-left: 3px solid var(--vurgu); color: var(--metin-orta);
+  }
   .yukleniyor { color: var(--metin-sol); font-size: 15px; }
   .yukleniyor::after {
     content: ""; animation: nokta 1.3s steps(4, end) infinite;
@@ -427,11 +448,58 @@ async function durumGuncelle(deneme = 0) {
   }
 }
 
-async function sor() {
-  const soru = soruEl.value.trim();
-  if (!soru) return;
+// Olay anlatimini secilebilir mesele basliklarina cevirir.
+// Olculdu (5 olay, 5 ayri hukuk alani): olay anlatiminda dogru madde
+// 1. sirada 1/5 (MRR 0,32); secilen mesele basliginda 5/5 (MRR 1,00).
+// Yani sistem tahmin etmiyor, kullaniciya soruyor.
+async function netlestir(soru) {
+  try {
+    const r = await fetch("/api/netlestir", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ soru }),
+    });
+    return r.ok ? await r.json() : null;
+  } catch (e) {
+    return null;      // netlestirme bir kolaylik, aramayi engellememeli
+  }
+}
+
+function cizNetlestirme(asil, meseleler) {
+  let h = '<div class="netlestir"><h3>Sorunuzu netleştirelim</h3>' +
+    '<p class="ipucu">Anlattığınız olayda birden fazla hukuki mesele var. ' +
+    'Hangisini sormak istediğinizi seçin.</p><div class="secenekler">';
+  for (const m of meseleler) {
+    h += '<button class="mesele" data-baslik="' + kacis(m.baslik) + '">' +
+      kacis(m.baslik) + "</button>";
+  }
+  h += '</div><button class="dogrudan">Hiçbiri — olayı olduğu gibi ara</button></div>';
+  ciktiEl.innerHTML = h;
+  ciktiEl.querySelectorAll(".mesele").forEach(function (b) {
+    b.addEventListener("click", function () { sor(b.dataset.baslik); });
+  });
+  ciktiEl.querySelector(".dogrudan").addEventListener("click", function () {
+    sor(asil, true);
+  });
+}
+
+async function sor(secilen, netlestirmeyiAtla) {
+  const asil = soruEl.value.trim();
+  if (!asil) return;
+  const soru = secilen || asil;
 
   gonderEl.disabled = true;
+
+  if (!secilen && !netlestirmeyiAtla) {
+    ciktiEl.innerHTML = '<div class="yukleniyor">Sorunuz inceleniyor</div>';
+    const n = await netlestir(asil);
+    if (n && n.gerekli && n.meseleler.length > 1) {
+      cizNetlestirme(asil, n.meseleler);
+      gonderEl.disabled = false;
+      return;
+    }
+  }
+
   ciktiEl.innerHTML = '<div class="yukleniyor">Mevzuat taranıyor</div>';
 
   try {
@@ -448,6 +516,14 @@ async function sor() {
     });
     if (!r.ok) throw new Error("Sunucu " + r.status + " döndürdü");
     ciz(await r.json());
+    if (secilen) {
+      // Hangi baslikla arandigi gorunmezse kullanici cevabin neden bu
+      // oldugunu bilemez.
+      const b = document.createElement("div");
+      b.className = "secilenMesele";
+      b.textContent = "Aranan mesele: " + secilen;
+      ciktiEl.prepend(b);
+    }
   } catch (e) {
     ciktiEl.innerHTML = '<div class="hata">Sunucuya ulaşılamadı.<code>' +
       kacis(e.message) + "</code></div>";

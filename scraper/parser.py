@@ -119,36 +119,79 @@ def _baslik_olabilir(satir: str) -> bool:
 # --------------------------------------------------------------------------
 # Kaynaklardan blok listesi
 # --------------------------------------------------------------------------
-# Sayfa alti dipnotlari govde metninden kucuk punto ile diziliyor. Olculdu
-# (4857 sayili Is Kanunu): govde 12.0 punto / 2024 satir, dipnot 11.0 punto /
-# 117 satir -- ayrim kesin, tek istisna yok.
+# Sayfa alti dipnotlarini ayiklamak SART, cunku dipnot sayfa altinda
+# maddenin IKI FIKRASI ARASINA dusuyor. Eski ayristirici dipnotu madde
+# siniri sayip maddeyi orada kapatiyordu ve kalan fikralar tumuyle
+# kayboluyordu: 4857 m.19 kulliyata 112 karakter olarak girmisti,
+# "savunmasini almadan ... feshedilemez" fikrasi hic yoktu.
 #
-# Bu ayrimi kullanmak SART, cunku dipnot sayfa altinda maddenin IKI FIKRASI
-# ARASINA dusuyor. Eski ayristirici dipnotu madde siniri sayip maddeyi orada
-# kapatiyordu ve kalan fikralar tumuyle kayboluyordu: 4857 m.19 kulliyata
-# 112 karakter olarak girmisti, "savunmasini almadan ... feshedilemez"
-# fikrasi hic yoktu.
+# UC KANIT BIRDEN aranir. Yalnizca punto farkina bakmak denendi ve
+# YIKICI cikti: yonetmelik/tebliglerde govdenin buyuk bolumu zaten
+# 11.04 punto ile dizili, "en cok kullanilan punto" 12.0 oldugu icin
+# gercek madde metni siliniyordu (8342 sayili yonetmelikte 3.211 satirin
+# 1.204'u, "Madde 1 - Bu Yonetmelik, av ve yaban hayvanlarinin..." dahil).
+# Konum da tek basina yetmiyor: ayni belgede kucuk puntolu satirlarin
+# 323'u sayfanin alt ucte birindeydi ve hepsi gercek metindi.
+#
+# Uc kanit: (1) govde puntosundan kucuk, (2) sayfanin alt bolgesinde,
+# (3) icinde bulundugu bitisik kosu bir dipnot ISARETIYLE basliyor.
+# Olculdu (9 belge): 4857'de 115 dipnot satiri yakalandi, 8342 ve 12466
+# yonetmeliklerinde HIC satir atilmadi.
 DIPNOT_PUNTO_PAYI = 0.4
+DIPNOT_ALT_BOLGE = 0.62          # sayfanin ust %62'sinde dipnot aranmaz
+# Dipnot isareti: ciplak sayi + tarih ya da "Bu ...". Dar tutuldu -- bir
+# dipnotu kacirmak metne gurultu birakir, gercek metni atmak ise hukmu
+# kaybettirir. "213 sayili Vergi Usul Kanununun ..." gibi govde satirlari
+# genis kalipta dipnot saniliyordu.
+DIPNOT_BASI_RE = re.compile(
+    r"^\d{1,3}\s+(?:\d{1,2}/\d{1,2}/\d{4}|Bu\b|Anayasa\b|Mülga\b|Değişik\b)")
 
 
-def _pdf_satir_puntolari(pdf_baytlari: bytes) -> list[tuple[float, str]]:
-    """PyMuPDF ile (punto, satir) ciftleri.
+def _pdf_sayfa_satirlari(pdf_baytlari: bytes) -> list[list[tuple[float, float, str]]]:
+    """Sayfa sayfa (punto, sayfadaki dikey oran, metin) uclusu.
 
     Satirin puntosu icindeki EN BUYUK span'dir; boylece govde satirinin
     sonundaki ust-simge dipnot isareti satiri kucuk gostermez.
     """
     import pymupdf
 
-    ciftler: list[tuple[float, str]] = []
+    sayfalar: list[list[tuple[float, float, str]]] = []
     with pymupdf.open(stream=pdf_baytlari, filetype="pdf") as belge:
         for sayfa in belge:
+            yukseklik = sayfa.rect.height or 1.0
+            satirlar: list[tuple[float, float, str]] = []
             for blok in sayfa.get_text("dict")["blocks"]:
                 for satir in blok.get("lines", []):
                     spanlar = satir.get("spans") or []
                     metin = _clean("".join(s["text"] for s in spanlar))
                     if metin and spanlar:
-                        ciftler.append((max(s["size"] for s in spanlar), metin))
-    return ciftler
+                        satirlar.append((max(s["size"] for s in spanlar),
+                                         satir["bbox"][1] / yukseklik, metin))
+            sayfalar.append(satirlar)
+    return sayfalar
+
+
+def _dipnotsuz(sayfalar: list[list[tuple[float, float, str]]]) -> list[str]:
+    """Sayfa altindaki dipnot kosularini atip satir listesi doner."""
+    tum = [s for sayfa in sayfalar for s in sayfa]
+    if not tum:
+        return []
+    govde_punto = Counter(p for p, _, _ in tum).most_common(1)[0][0]
+    esik = govde_punto - DIPNOT_PUNTO_PAYI
+
+    kalan: list[str] = []
+    for satirlar in sayfalar:
+        # Sayfanin sonundan geriye dogru, kucuk puntolu ve alt bolgedeki
+        # bitisik kosuyu bul.
+        i = len(satirlar)
+        while i > 0 and satirlar[i - 1][0] < esik and satirlar[i - 1][1] >= DIPNOT_ALT_BOLGE:
+            i -= 1
+        # Kosu ancak bir dipnot ISARETINDEN itibaren atilir; isaret yoksa
+        # kosu gercek metindir ve tumuyle korunur.
+        bas = next((j for j in range(i, len(satirlar))
+                    if DIPNOT_BASI_RE.match(satirlar[j][2])), None)
+        kalan += [t for _, _, t in satirlar[:bas if bas is not None else len(satirlar)]]
+    return kalan
 
 
 def bloklar_pdf(pdf_baytlari: bytes) -> list[str]:
@@ -161,7 +204,7 @@ def bloklar_pdf(pdf_baytlari: bytes) -> list[str]:
     eslesmesini dogrudan kaybettirdigi icin bu fark onemli.
     """
     try:
-        satirlar = _pdf_satir_puntolari(pdf_baytlari)
+        sayfalar = _pdf_sayfa_satirlari(pdf_baytlari)
     except ImportError:
         from pypdf import PdfReader
 
@@ -169,14 +212,7 @@ def bloklar_pdf(pdf_baytlari: bytes) -> list[str]:
         ham = "\n".join((s.extract_text() or "") for s in reader.pages)
         return [t for h in ham.split("\n") if (t := _clean(h))]
 
-    if not satirlar:
-        return []
-    # Govde puntosu = en cok satirda kullanilan punto. Baslik satirlari
-    # govdeden BUYUK oldugu icin bu esikte kalir; yalnizca kucuk punto
-    # (dipnot) duser.
-    govde_punto = Counter(p for p, _ in satirlar).most_common(1)[0][0]
-    esik = govde_punto - DIPNOT_PUNTO_PAYI
-    return [t for p, t in satirlar if p >= esik]
+    return _dipnotsuz(sayfalar)
 
 
 def bloklar_html(html: str) -> list[str]:

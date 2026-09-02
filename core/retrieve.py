@@ -17,17 +17,50 @@ from .store import MevzuatStore
 
 log = logging.getLogger(__name__)
 
-# "TBK 6", "4857 sayili kanun madde 53", "IS KANUNU m. 25", "madde 18"
+# Madde referansi: "madde 19", "m.3/A", "19. madde", "gecici madde 5".
+# Onek bicimde ("19 madde") sira eki ZORUNLU tutuldu; aksi halde
+# "4857 madde 19" sorgusunda 4857 madde numarasi saniliyordu.
 MADDE_REF_RE = re.compile(
-    r"(?:madde|m\.|mad\.)\s*(\d+)|(\d+)\s*(?:\.|inci|nci|uncu|üncü|ıncı)?\s*madde",
+    r"(?:(?P<tip1>ek|geçici|gecici|mükerrer|mukerrer)\s+)?"
+    r"(?:madde|m\.|mad\.)\s*(?P<no1>\d+(?:\s*/\s*[a-zA-ZçğıöşüÇĞİÖŞÜ])?)"
+    r"|(?:(?P<tip2>ek|geçici|gecici|mükerrer|mukerrer)\s+)?"
+    r"(?P<no2>\d+(?:\s*/\s*[a-zA-ZçğıöşüÇĞİÖŞÜ])?)\s*"
+    r"(?:\.|inci|nci|uncu|üncü|ıncı)\s*madde",
     re.IGNORECASE)
-KANUN_NO_RE = re.compile(r"\b(\d{4})\s*(?:sayılı|sayili)\b", re.IGNORECASE)
 
-# Yaygin kisaltmalar -> kanun numarasi
+# Kanun numarasi. "sayili" kelimesini sart kosmak avukatin yazdigi bicimlerin
+# cogunu kaciriyordu: "4857 madde 19", "6098 Kanunu m.344" gibi.
+KANUN_NO_RE = re.compile(
+    r"\b(?P<a>\d{3,5})\s*(?:sayılı|sayili|say\.)"
+    r"|\b(?P<b>\d{3,5})\s*(?:sayılı|sayili)?\s*kanunu?\b"
+    # "4857 madde 19" / "4857 geçici madde 6": sayidan hemen sonra madde
+    # referansi geliyorsa o sayi kanun numarasidir.
+    r"|\b(?P<c>\d{3,5})\s*"
+    r"(?=(?:ek|geçici|gecici|mükerrer|mukerrer)?\s*(?:madde|m\.|mad\.))",
+    re.IGNORECASE)
+
+# Kisaltma ve kanun adi -> numara. Avukat kanunu numarayla degil adiyla
+# aniyor ("TBK 344", "Is Kanunu 19. madde"). Ad taninmayinca dogrudan madde
+# yolu bos donuyor, arama da yalnizca madde NUMARASINA bakip yanlis kanunun
+# maddesini 1. siraya cikariyordu -- olculdu: "4857 madde 19" -> 5285 m.19,
+# "TMK 166" -> 5905 m.166, "TBK 344" -> 6102 m.344.
 KISALTMALAR = {
     "tbk": "6098", "tmk": "4721", "tck": "5237", "hmk": "6100",
     "ttk": "6102", "cmk": "5271", "ik": "4857", "iyuk": "2577",
-    "vuk": "213", "kvkk": "6698", "ikk": "6331",
+    "vuk": "213", "kvkk": "6698", "ikk": "6331", "iik": "2004",
+    "türk borçlar kanunu": "6098", "borçlar kanunu": "6098",
+    "türk medeni kanunu": "4721", "medeni kanunu": "4721",
+    "medeni kanun": "4721", "türk ceza kanunu": "5237",
+    "ceza kanunu": "5237", "iş kanunu": "4857",
+    "hukuk muhakemeleri kanunu": "6100", "türk ticaret kanunu": "6102",
+    "ticaret kanunu": "6102", "ceza muhakemesi kanunu": "5271",
+    "icra ve iflas kanunu": "2004", "vergi usul kanunu": "213",
+    "idari yargılama usulü kanunu": "2577",
+    "kişisel verilerin korunması kanunu": "6698",
+    "iş sağlığı ve güvenliği kanunu": "6331",
+    "sosyal sigortalar ve genel sağlık sigortası kanunu": "5510",
+    "avukatlık kanunu": "1136", "kabahatler kanunu": "5326",
+    "tüketicinin korunması hakkında kanun": "6502",
 }
 
 # Turkce harf -> ASCII karsiligi
@@ -36,6 +69,9 @@ _TR_HARITA = str.maketrans({
     "ğ": "g", "Ğ": "g", "ü": "u", "Ü": "u", "ö": "o", "Ö": "o",
     "ç": "c", "Ç": "c", "â": "a", "Â": "a", "î": "i", "Î": "i",
     "û": "u", "Û": "u",
+    # Birlesik nokta: Python "İ".lower() harfi "i" + U+0307 diye ikiye
+    # ayiriyor. Katlamada dusurulmezse ayni kelimenin iki ayri bicimi olusuyor.
+    "̇": None,
 })
 
 
@@ -48,6 +84,13 @@ def _tr_katla(metin: str) -> str:
     Indeks ve sorgu tarafinda ayni katlama uygulanmali.
     """
     return metin.translate(_TR_HARITA).lower()
+
+
+# Kisaltma tablosunun aksansiz hali. Uzun ad once denenir ki "turk ceza
+# kanunu" arayan sorgu "ceza kanunu" girdisine dusup ayni numarayi bulsa da
+# yanlis konumdan eslesmesin.
+KISALTMALAR_KATLI = {_tr_katla(ad): no for ad, no in KISALTMALAR.items()}
+_KISALTMA_SIRALI = sorted(KISALTMALAR_KATLI, key=len, reverse=True)
 
 
 # Soru kaliplari. Kullanicinin sorusu ile kanun metninin dili arasindaki
@@ -210,25 +253,56 @@ class Retriever:
         return re.findall(r"\w+", _tr_katla(metin))
 
     # ---------- madde numarasi ----------
-    def _dogrudan_madde(self, soru: str, limit: int = 3) -> list[dict]:
-        m = MADDE_REF_RE.search(soru)
-        if not m:
-            return []
-        madde_no = m.group(1) or m.group(2)
+    @staticmethod
+    def _kanun_bul(soru: str) -> tuple[str | None, int]:
+        """Sorudaki kanunu bulur; (numara, referansin bittigi konum) doner.
 
-        kanun_no = None
+        Ad/kisaltma ONCE denenir. Sayi kaliplari once denenirse "TMK 166
+        maddesi" sorgusunda 166 kanun numarasi saniliyor -- oysa orada
+        kanun zaten adiyla yazilmis.
+        """
+        katli = _tr_katla(soru)
+        for ad in _KISALTMA_SIRALI:
+            if m := re.search(rf"\b{re.escape(ad)}\b", katli):
+                return KISALTMALAR_KATLI[ad], m.end()
         if km := KANUN_NO_RE.search(soru):
-            kanun_no = km.group(1)
-        else:
-            for kis, no in KISALTMALAR.items():
-                if re.search(rf"\b{kis}\b", soru, re.IGNORECASE):
-                    kanun_no = no
-                    break
+            return (km.group("a") or km.group("b") or km.group("c")), km.end()
+        return None, 0
 
-        adaylar = [k for k in (self._bm25_kayitlar or self.store.tum_kayitlar())
-                   if k.get("madde_no") == madde_no
-                   and (kanun_no is None or k.get("mevzuat_no") == kanun_no)]
-        return adaylar[:limit]
+    @staticmethod
+    def _madde_bul(soru: str, ad_sonu: int) -> str | None:
+        """Madde referansini kulliyattaki yazilisa cevirir ("m.3/a" -> "3/A")."""
+        no = tip = ""
+        if m := MADDE_REF_RE.search(soru):
+            no = m.group("no1") or m.group("no2") or ""
+            tip = m.group("tip1") or m.group("tip2") or ""
+        elif ad_sonu:
+            # "TBK 344", "TMK 166 maddesi" -- sayi kanun adindan hemen sonra
+            # geliyor ve sira eki yok. Bu bicim yalnizca kanun ZATEN bulunmus
+            # ve geri kalan sadece bu sayiysa kabul edilir.
+            if s := re.match(r"[\s,.:]*(\d+(?:\s*/\s*[a-zA-ZçğıöşüÇĞİÖŞÜ])?)"
+                             r"\s*(?:\.|inci|nci|uncu|üncü|ıncı)?"
+                             r"\s*(?:madde\w*)?\s*$",
+                             soru[ad_sonu:], re.IGNORECASE):
+                no = s.group(1)
+        if not no:
+            return None
+        tip = {"gecici": "Geçici", "geçici": "Geçici", "ek": "Ek",
+               "mukerrer": "Mükerrer", "mükerrer": "Mükerrer"}.get(tip.lower(), "")
+        no = re.sub(r"\s+", "", no).upper()
+        return f"{tip} {no}".strip()
+
+    def _dogrudan_madde(self, soru: str, limit: int = 3) -> list[dict]:
+        kanun_no, ad_sonu = self._kanun_bul(soru)
+        madde_no = self._madde_bul(soru, ad_sonu)
+        # Kanun bilinmiyorsa bu yol KULLANILMAZ. Eskiden ayni numarayi tasiyan
+        # rastgele bir kanunun maddesi donuyordu; bu yol RRF'te en yuksek
+        # agirligi (3.0) tasidigi icin de dogruca 1. siraya cikiyordu.
+        if madde_no is None or kanun_no is None:
+            return []
+        return [k for k in (self._bm25_kayitlar or self.store.tum_kayitlar())
+                if k.get("madde_no") == madde_no
+                and k.get("mevzuat_no") == kanun_no][:limit]
 
     def _ham_benzerlik(self, soru: str, mulga_haric: bool = True) -> float:
         """Kullanicinin ham sorusunun kulliyata en yakin benzerligi.
@@ -383,7 +457,8 @@ class Retriever:
                 giris["kaynaklar"].append(kaynak)
 
         # 1) Dogrudan madde numarasi -- en guvenilir, en yuksek agirlik
-        ekle(self._dogrudan_madde(soru), agirlik=3.0, kaynak="madde_no")
+        dogrudan = self._dogrudan_madde(soru)
+        ekle(dogrudan, agirlik=3.0, kaynak="madde_no")
 
         # 2) Anlamsal
         vek = self.embedder.encode_query(soru)
@@ -414,7 +489,7 @@ class Retriever:
                     for s in sirali]
 
         if not self.rerank:
-            return birlesik[:limit]
+            return self._one_sabitle(dogrudan, birlesik, birlesik, limit)
 
         # Cross-encoder yavas oldugu icin tum kulliyata degil, yalnizca ilk
         # asamanin getirdigi adaylara uygulanir. RERANK_ADAY bu pencerenin
@@ -422,7 +497,30 @@ class Retriever:
         # tutulursa sorgu yavaslar.
         pencere = birlesik[:max(config.RERANK_ADAY, limit)]
         try:
-            return self.reranker.sirala(soru, pencere, limit)
+            sirali_sonuc = self.reranker.sirala(soru, pencere, limit)
         except Exception as exc:
             log.warning("yeniden siralama basarisiz, temel siralama kullaniliyor: %s", exc)
-            return birlesik[:limit]
+            sirali_sonuc = birlesik[:limit]
+        return self._one_sabitle(dogrudan, sirali_sonuc, birlesik, limit)
+
+    @staticmethod
+    def _one_sabitle(dogrudan: list[dict], sonuc: list[dict],
+                     birlesik: list[dict], limit: int) -> list[dict]:
+        """Numarayla istenen maddeyi listenin basina sabitler.
+
+        Avukat "4857 madde 19" yazdiginda o madde bir TAHMIN degil, istegin
+        kendisi. Ama boyle bir sorguda anlamsal icerik yok; cross-encoder
+        maddeyi asagi itiyordu. Olculdu: "4857 madde 19" sorgusunda dogru
+        madde ilk 5'te hic yoktu, 1. sirada 5285 m.19 duruyordu -- dogru
+        numara, yanlis kanun.
+        """
+        if not dogrudan:
+            return sonuc[:limit]
+        kimlikler = {k.get("chunk_id") for k in dogrudan}
+        # Once yeniden siralanmis surumu al (puan alanlarini tasiyor),
+        # pencereye girmediyse birlesik listeden tamamla.
+        onde = [k for k in sonuc if k.get("chunk_id") in kimlikler]
+        eksik = kimlikler - {k.get("chunk_id") for k in onde}
+        onde += [k for k in birlesik if k.get("chunk_id") in eksik]
+        kalan = [k for k in sonuc if k.get("chunk_id") not in kimlikler]
+        return (onde + kalan)[:limit]

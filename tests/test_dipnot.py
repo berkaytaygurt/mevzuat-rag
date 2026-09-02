@@ -106,3 +106,46 @@ def test_harf_ekli_madde_numarasi_yakalaniyor():
 def test_harfli_madde_chunk_id_cakismiyor():
     m = {x.madde_no: x for x in maddeleri_cikar(BLOKLAR_HARFLI, mevzuat_no="2576")}
     assert m["3"].chunk_id != m["3/A"].chunk_id
+
+
+# --------------------------------------------------------------------------
+# Punto TEK BASINA yeterli kanit degil
+# --------------------------------------------------------------------------
+# Ilk deneme yalnizca punto farkina bakiyordu ve yikici cikti:
+# yonetmelik/tebliglerde govdenin buyuk bolumu zaten 11.04 punto ile dizili,
+# "en cok kullanilan punto" 12.0 oldugu icin GERCEK MADDE METNI siliniyordu
+# (8342 sayili yonetmelikte 3.211 satirin 1.204'u). Artik uc kanit birden
+# araniyor: kucuk punto + sayfa alt bolgesi + dipnot isaretiyle baslayan kosu.
+from scraper.parser import _dipnotsuz
+
+
+def test_kucuk_punto_tek_basina_metni_silmiyor():
+    """Govdenin bir kismi kucuk puntoysa o metin ATILMAMALI."""
+    sayfa = [(12.0, 0.10, "BIRINCI BOLUM"),
+             (11.0, 0.20, "Madde 1 — Bu Yönetmelik, av ve yaban hayvanlarının"),
+             (11.0, 0.30, "üretimi ve yetiştiriciliğini kapsar."),
+             (11.0, 0.75, "Madde 2 — Bu Yönetmelik 4915 sayılı Kanuna dayanır.")]
+    kalan = _dipnotsuz([sayfa])
+    assert len(kalan) == 4, kalan
+    assert any("av ve yaban" in t for t in kalan)
+    assert any("4915 sayılı Kanuna dayanır" in t for t in kalan)
+
+
+def test_sayfa_altindaki_dipnot_kosusu_atiliyor():
+    sayfa = [(12.0, 0.10, "Madde 19 - İşveren fesih bildirimini yazılı yapmak"),
+             (12.0, 0.20, "ve sebebini açıkça belirtmek zorundadır."),
+             (11.0, 0.88, "6 18/2/2009 tarihli ve 5838 sayılı Kanunun 32 nci maddesiyle;"),
+             (11.0, 0.92, "bu bentte yer alan ibare değiştirilmiştir.")]
+    kalan = _dipnotsuz([sayfa])
+    assert len(kalan) == 2, kalan
+    assert not any("5838" in t for t in kalan)
+
+
+def test_dipnot_isareti_yoksa_alt_bolge_korunuyor():
+    """Sayfa altindaki kucuk puntolu metin, dipnot isareti yoksa metindir."""
+    sayfa = [(12.0, 0.10, "Madde 5 - Genel hükümler uygulanır."),
+             (11.0, 0.85, "213 sayılı Vergi Usul Kanununun 148 inci maddesi"),
+             (11.0, 0.90, "hükümleri uyarınca bilgi verilir.")]
+    kalan = _dipnotsuz([sayfa])
+    assert len(kalan) == 3, kalan
+    assert any("213 sayılı Vergi Usul" in t for t in kalan)

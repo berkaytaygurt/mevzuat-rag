@@ -70,3 +70,32 @@ def test_sozluk_sadece_aksanli_karsiliklari_tutar(tmp_path):
     s = sozluk_kur(ORNEK_MADDELER, yol=yol)
     assert "hapis" not in s          # aksansiz kelime, kayit gereksiz
     assert s.get("hirsizlik") == "hırsızlık"
+
+
+# Python'un lower()'i "İ" harfini "i" + U+0307 diye ikiye ayiriyor. Kanun
+# basliklari BUYUK yazildigi icin sozluge bu bozuk bicim giriyordu ve
+# duzeltici sorguya gorunmez bir karakter sokuyordu ("türk medeni kanunu"
+# -> "türk medeni̇ kanunu"). Olculdu: 106.559 kelimenin 2.411'i boyleydi.
+def test_buyuk_i_harfi_birlesik_nokta_uretmiyor():
+    from core.yazim import kucult
+
+    assert kucult("MEDENİ") == "medeni"
+    assert kucult("İŞ") == "iş"
+    assert kucult("TEBLİĞİ") == "tebliği"
+    assert "̇" not in kucult("YÖNETMELİĞİ")
+
+
+def test_sozlukte_birlesik_nokta_olusmuyor(tmp_path):
+    from core.yazim import sozluk_kur
+
+    maddeler = [{"mevzuat_adi": "TÜRK MEDENİ KANUNU", "baslik": "TEBLİĞİ",
+                 "metin": "YÖNETMELİĞİ uygulanır."}] * 2
+    sozluk = sozluk_kur(maddeler, tmp_path / "yazim.json")
+    assert not [d for d in sozluk.values() if "̇" in d], sozluk
+    assert sozluk.get("yonetmeligi") == "yönetmeliği"
+
+
+def test_katlama_birlesik_noktayi_dusuruyor():
+    from core.retrieve import _tr_katla
+
+    assert _tr_katla("medeni̇") == _tr_katla("medeni")

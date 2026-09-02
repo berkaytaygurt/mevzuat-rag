@@ -63,9 +63,11 @@ def test_baslik_bm25_metninde_tekrarlanir():
     ("4857 sayılı kanun madde 18", "18"),
 ])
 def test_madde_referansi_yakalanir(soru, beklenen):
+    # MADDE_REF_RE artik adli gruplar kullaniyor; "geçici"/"ek" oneki ve
+    # "3/A" gibi harf ekleri de yakalandigi icin konum numaralari degisti.
     m = MADDE_REF_RE.search(soru)
     assert m is not None
-    assert (m.group(1) or m.group(2)) == beklenen
+    assert (m.group("no1") or m.group("no2")) == beklenen
 
 
 def test_kisaltmalar_dogru_kanuna_isaret_eder():

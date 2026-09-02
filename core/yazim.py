@@ -29,6 +29,21 @@ KELIME_RE = re.compile(r"\w+", re.UNICODE)
 EN_KISA = 3
 
 
+def kucult(kelime: str) -> str:
+    """Turkceye uygun kucultme.
+
+    Python'un lower()'i Turkce "İ" harfini "i" + U+0307 (birlesik nokta)
+    diye ikiye ayiriyor. Kanun metinleri basliklari BUYUK harfle yazdigi
+    icin sozluge bu bozuk bicim giriyordu ve duzeltici sorguya gorunmez bir
+    karakter sokuyordu: "türk medeni kanunu" -> "türk medeni\\u0307 kanunu".
+    Sonra vektor ve cross-encoder bunu baska bir kelime sayiyordu.
+
+    Olculdu: sozlukteki 106.559 kelimenin 2.411'i (%2,3) bu bozuk bicimdeydi
+    -- "yönetmeliği", "tebliği", "ithalatta" gibi cok gecenler dahil.
+    """
+    return kelime.replace("İ", "i").replace("I", "ı").lower()
+
+
 def sozluk_kur(maddeler: list[dict], yol: Path | None = None) -> dict[str, str]:
     """Maddelerden ASCII -> gercek yazim sozlugu uretir ve diske yazar."""
     sayac: dict[str, Counter] = defaultdict(Counter)
@@ -36,7 +51,7 @@ def sozluk_kur(maddeler: list[dict], yol: Path | None = None) -> dict[str, str]:
         metin = f"{m.get('mevzuat_adi', '')} {m.get('baslik', '')} {m.get('metin', '')}"
         for kelime in KELIME_RE.findall(metin):
             if len(kelime) >= EN_KISA:
-                sayac[_tr_katla(kelime)][kelime.lower()] += 1
+                sayac[_tr_katla(kelime)][kucult(kelime)] += 1
 
     # Yalnizca aksanli bir karsiligi olanlari sakla: "tazminat" gibi zaten
     # ASCII olan kelimeler icin kayit tutmak sozlugu gereksiz buyutur.

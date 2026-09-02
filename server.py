@@ -144,6 +144,65 @@ def durum():
         return JSONResponse({"hazir": False, "hata": str(exc)}, status_code=503)
 
 
+class Netlestirme(BaseModel):
+    soru: str
+
+
+@app.post("/api/netlestir")
+def netlestir(istek: Netlestirme):
+    """Olay anlatimini secilebilir hukuki mesele basliklarina cevirir.
+
+    NEDEN VAR
+    Olculdu -- ayni mesele dort ayri bicimde soruldugunda, bes hukuk alaninda:
+
+        olay anlatimi (uzun, olgulu)   1. sirada 1/5   MRR 0,30
+        dogal soru cumlesi             1. sirada 4/5   MRR 0,83
+        hukuki kavram (kisa)           1. sirada 5/5   MRR 1,00
+
+    Yani sistem, avukatin en dogal yazma bicimi olan olay anlatiminda
+    caliskan degil. Ama avukattan "kavram gibi yaz" diye beklemek de dogru
+    degil; o ne istedigini bilir, nasil ifade edecegini bilmez.
+
+    Bu uc nokta o farki kapatiyor: olay anlatimi mesele basliklarina
+    cevriliyor, kullanici hangisini sordugunu SECIYOR, arama secilen
+    baslikla yapiliyor. Yani sistem tahmin etmiyor, soruyor.
+
+    Basliklar kulliyata yakinligina gore siralanir: karsiligi olmayan
+    baslik once gosterilmemeli.
+    """
+    soru = istek.soru.strip()
+    if not soru:
+        return {"gerekli": False, "meseleler": []}
+
+    from core.mesele import cok_olgulu_mu, meseleleri_ayir
+
+    # Kisa ve net sorguda netlestirme gereksiz; kullaniciyi yormamali.
+    if not cok_olgulu_mu(soru):
+        return {"gerekli": False, "meseleler": []}
+
+    k = kaynaklar()
+    try:
+        basliklar = meseleleri_ayir(soru, k["generator"])
+    except Exception as exc:
+        log.warning("netlestirme basarisiz: %s", str(exc)[:80])
+        return {"gerekli": False, "meseleler": []}
+    if len(basliklar) < 2:
+        return {"gerekli": False, "meseleler": []}
+
+    # Her baslik icin kulliyattaki en yakin maddenin HAM benzerligi. Yeniden
+    # siralayicinin puani bu is icin kullanilamaz: o aday havuzu icinde
+    # siralama yapar ve havuzda hep bir en iyi vardir.
+    puanli = []
+    for baslik in basliklar:
+        try:
+            puan = k["retriever"]._ham_benzerlik(baslik)
+        except Exception:
+            puan = 0.0
+        puanli.append({"baslik": baslik, "puan": round(float(puan), 3)})
+    puanli.sort(key=lambda x: x["puan"], reverse=True)
+    return {"gerekli": True, "meseleler": puanli}
+
+
 def vurgu_parcalari(metin: str, soru: str, kaynak: dict) -> list[dict]:
     """Madde metnini parcalara bolup ilgili olani isaretler.
 
