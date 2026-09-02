@@ -96,6 +96,15 @@ def cmd_cek(args) -> None:
         hedefler = [(k.mevzuat_no, k.tur, k.tertip, k.ad, k.pdf_url, k.metinsiz)
                     for k in kayitlar]
 
+    # Katalog sirasi belirli oldugu icin yarim kalan bir calisma buradan
+    # devam ettirilebilir. --yenile-tur ile calisirken hicbir belge
+    # atlanmiyor; ara kayda kadar islenmis binlerce belgeyi bastan
+    # ayristirmak saatler yiyor.
+    if args.baslangic:
+        atlanan = min(args.baslangic, len(hedefler))
+        log.info("ilk %d belge atlaniyor (--baslangic)", atlanan)
+        hedefler = hedefler[atlanan:]
+
     # Mevcut veriyi koru: cek komutu daha once dosyayi bastan yaziyordu ve
     # eksikleri tamamlamak icin calistirildiginda onceki her seyi siliyordu.
     mevcut: dict[str, dict] = {}
@@ -447,6 +456,8 @@ def main() -> None:
                    help="mevcut maddeleri koruma, bastan yaz")
     b.add_argument("--yenile-tur", type=int, nargs="+", default=None,
                    help="bu turleri, indirilmis olsalar da yeniden cek")
+    b.add_argument("--baslangic", type=int, default=0,
+                   help="katalogda ilk N belgeyi atla (yarim kalan isi surdurur)")
     b.set_defaults(func=cmd_cek)
 
     c = alt.add_parser("indeksle", help="GPU'da embed et, Qdrant + BM25 kur")
