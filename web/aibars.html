@@ -389,6 +389,17 @@ function kacis(s) {
 async function durumGuncelle(deneme = 0) {
   try {
     const r = await fetch("/api/durum");
+    // 401 ile "henuz yuklenmedi" ayirt edilmeli: onceki surum ikisini de
+    // "hazirlaniyor" diye gosteriyordu ve kullanici sonsuza kadar bekliyordu.
+    // Tarayici sayfayi onbellekten acinca kimlik gonderilmiyor ve boyle
+    // oluyor.
+    if (r.status === 401 || r.status === 403) {
+      $("#nokta").className = "nokta kapali";
+      $("#durumMetni").innerHTML =
+        '<a href="' + location.pathname + '?g=' + Date.now() +
+        '" style="color:inherit">giriş gerekli — tıklayın</a>';
+      return;
+    }
     const d = await r.json();
     if (!d.hazir) throw new Error(d.hata || "hazır değil");
     $("#nokta").className = "nokta acik";
@@ -612,7 +623,7 @@ function ciz(d) {
     h += '<div class="karsi">';
     kt.maddeler.forEach(m => {
       h += '<div class="madde">' +
-        '<div class="madde-bas" onclick="this.parentNode.classList.toggle('acik')">' +
+        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
           '<span class="ok">▶</span>' +
           '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
           '<span class="madde-baslik">' +
