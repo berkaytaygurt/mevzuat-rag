@@ -100,18 +100,6 @@
   #gonder:hover:not(:disabled) { opacity: .85; }
   #gonder:disabled { opacity: .35; cursor: default; }
 
-  /* ---------- örnek sorular ---------- */
-  .ornekler {
-    display: flex; gap: 7px; flex-wrap: wrap; margin: 16px 0 0;
-  }
-  .ornek {
-    font-family: var(--sans); font-size: 13px; color: var(--metin-orta);
-    background: transparent; border: 1px solid var(--kenar);
-    border-radius: 999px; padding: 5px 13px; cursor: pointer;
-    transition: all .15s;
-  }
-  .ornek:hover { border-color: var(--vurgu); color: var(--vurgu); }
-
   /* ---------- ayarlar (gizli) ---------- */
   .ayar-satiri { margin-top: 14px; }
   #ayarAc {
@@ -336,7 +324,7 @@
      dogru madde 5 soruda 1'inde 1. sirada, "hukuki kavram" olarak
      soruldugunda 5'inde 5'inde. Bu farki kullaniciya soylemek bedava. */
   .ipucu-satiri {
-    margin: 10px 2px 0; font-size: 12.5px; color: var(--metin-sol);
+    margin: 16px 2px 0; font-size: 12.5px; color: var(--metin-sol);
     line-height: 1.6;
   }
   .ipucu-satiri b { color: var(--metin-orta); font-weight: 600; }
@@ -406,8 +394,6 @@
     </button>
   </div>
 
-  <div class="ornekler" id="ornekler"></div>
-
   <div class="ipucu-satiri">
     <b>Olayı değil, meseleyi yazın.</b> Ölçüldü: aynı soru olay olarak
     anlatıldığında doğru madde 5 sorudan 1'inde ilk sırada çıkıyor, hukuki
@@ -441,19 +427,6 @@
 <script>
 const $ = s => document.querySelector(s);
 const soruEl = $("#soru"), gonderEl = $("#gonder"), ciktiEl = $("#cikti");
-
-const ORNEKLER = [
-  "yıllık ücretli izin süresi kaç gündür",
-  "TBK 6. madde ne diyor",
-  "kişisel verilerin işlenme şartları nelerdir",
-];
-
-ORNEKLER.forEach(o => {
-  const b = document.createElement("button");
-  b.className = "ornek"; b.textContent = o;
-  b.onclick = () => { soruEl.value = o; boyutlandir(); sor(); };
-  $("#ornekler").appendChild(b);
-});
 
 $("#ayarAc").onclick = () => $("#ayarlar").classList.toggle("acik");
 
