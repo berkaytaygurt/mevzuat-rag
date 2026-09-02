@@ -72,6 +72,19 @@ def kaynaklar():
 
         # Karar indeksi istege bagli: yoksa ya da bozuksa site mevzuatla
         # calismaya devam eder. Kararlar burada bir ek, onkosul degil.
+        # Atif zinciri: hangi karar hangi maddeyi yorumlamis. Kararlarin
+        # kendi metninden otomatik cikarildi; ticari veri tabanlari bu
+        # baglantiyi elle kuruyor.
+        _kaynaklar["zincir"] = None
+        try:
+            from core.atif_zinciri import AtifZinciri
+            z = AtifZinciri()
+            if z.hazir_mi():
+                _kaynaklar["zincir"] = z
+                log.info("atif zinciri bulundu: %d madde", z.sayi())
+        except Exception as exc:
+            log.warning("atif zinciri yuklenemedi: %s", exc)
+
         _kaynaklar["karar"] = None
         try:
             from core.karar_ara import KararArayici
@@ -114,6 +127,10 @@ class Soru(BaseModel):
     k: int = 10
     mulga_haric: bool = True
     cevap_uret: bool = True
+    karsi_taraf: bool = True
+    vurgu: bool | None = None
+
+
 
 
 @app.get("/api/durum")
@@ -127,6 +144,22 @@ def durum():
         return JSONResponse({"hazir": False, "hata": str(exc)}, status_code=503)
 
 
+def vurgu_parcalari(metin: str, soru: str, kaynak: dict) -> list[dict]:
+    """Madde metnini parcalara bolup ilgili olani isaretler.
+
+    Hata durumunda tek parca doner: vurgu bir kolaylik, cevabi engellememeli.
+    """
+    if not metin:
+        return []
+    try:
+        from core.vurgu import parcalari_hazirla
+
+        return parcalari_hazirla(metin, soru, kaynak["retriever"].reranker)
+    except Exception as exc:
+        log.debug("vurgu hesaplanamadi: %s", exc)
+        return [{"metin": metin, "vurgu": False}]
+
+
 @app.post("/api/sor")
 def sor(istek: Soru):
     if not istek.soru.strip():
@@ -136,6 +169,15 @@ def sor(istek: Soru):
     maddeler = k["retriever"].ara(istek.soru, limit=istek.k,
                                  mulga_haric=istek.mulga_haric)
 
+    # Sorgunun nasil anlasildigi: kullaniciya "seni soyle anladim" demek icin
+    anlasilan = getattr(k["retriever"], "son_genisletme", None)
+
+    # Guven: en iyi HAM vektor benzerligi esigin altindaysa soru kulliyatla
+    # ilgisiz demektir. Yeniden siralayicinin puani bu is icin kullanilamaz
+    # (aday havuzu icinde siralama yapar, havuzda hep bir en iyi vardir).
+    vektor_puani = getattr(k["retriever"], "son_vektor_puani", 0.0)
+    guven_dusuk = vektor_puani < config.GUVEN_ESIGI
+
     kararlar = []
     if k.get("karar") is not None:
         try:
@@ -143,10 +185,29 @@ def sor(istek: Soru):
         except Exception as exc:      # karar tarafi cevabi engellememeli
             log.warning("karar aramasi basarisiz: %s", exc)
 
-    cevap, cevap_hatasi = None, None
-    if istek.cevap_uret and maddeler:
+    # Karsi tarafin dayanabilecegi maddeler. Tavsiye degil, yalnizca
+    # "bunlara da bak" listesi -- cikarim kullanicinin.
+    karsi_sorgu, karsi_maddeler = "", []
+    if istek.karsi_taraf and maddeler and not guven_dusuk:
+        try:
+            from core.karsi_taraf import karsi_maddeler as _karsi
+            karsi_sorgu, karsi_maddeler = _karsi(
+                istek.soru, k["retriever"], k["generator"],
+                limit=5, asil_maddeler=maddeler)
+        except Exception as exc:
+            log.warning("karsi taraf aramasi basarisiz: %s", str(exc)[:80])
+
+    cevap, cevap_hatasi, dogrulama = None, None, None
+    if guven_dusuk:
+        # Alakasiz soruda cevap uretmek, modelin eldeki maddelerden bir sey
+        # uydurmasina yol aciyor. Uretimi hic baslatmiyoruz.
+        cevap = ("Bu soru için külliyatta yeterince ilgili bir düzenleme "
+                 "bulamadım. Aşağıdaki maddeler en yakın eşleşmeler ama "
+                 "sorunuzu karşılamayabilir.")
+    elif istek.cevap_uret and maddeler:
         try:
             cevap = k["generator"].cevapla(istek.soru, maddeler, kararlar)
+            dogrulama = getattr(k["generator"], "son_dogrulama", None)
         except Exception as exc:
             cevap_hatasi = str(exc)
             log.warning("cevap uretilemedi: %s", exc)
@@ -155,6 +216,26 @@ def sor(istek: Soru):
         "soru": istek.soru,
         "cevap": cevap,
         "cevap_hatasi": cevap_hatasi,
+        "dogrulama": dogrulama,
+        "anlasilan": anlasilan,
+        "karsi_taraf": {
+            "sorgu": karsi_sorgu,
+            "maddeler": [{
+                "mevzuat_adi": m.get("mevzuat_adi", ""),
+                "mevzuat_no": m.get("mevzuat_no", ""),
+                "madde_no": m.get("madde_no", ""),
+                "baslik": m.get("baslik", ""),
+                "metin": m.get("metin", ""),
+                "resmi_url": resmi_url(m),
+                "yorumlayan_kararlar": (
+                    k["zincir"].kararlar(m.get("mevzuat_no", ""),
+                                         str(m.get("madde_no", "")))
+                    if k.get("zincir") else []),
+            } for m in karsi_maddeler],
+        },
+        "guven": {"puan": round(vektor_puani, 3),
+                  "esik": config.GUVEN_ESIGI,
+                  "dusuk": guven_dusuk},
         "maddeler": [{
             "mevzuat_adi": m.get("mevzuat_adi", ""),
             "mevzuat_no": m.get("mevzuat_no", ""),
@@ -167,6 +248,18 @@ def sor(istek: Soru):
             "skor": round(m.get("skor", 0), 4),
             "kaynaklar": m.get("kaynaklar", []),
             "resmi_url": resmi_url(m),
+            "yorumlayan_kararlar": (
+                k["zincir"].kararlar(m.get("mevzuat_no", ""),
+                                     str(m.get("madde_no", "")))
+                if k.get("zincir") else []),
+            # Metin parcalari + hangisinin soruyla ilgili oldugu. Vurgu
+            # yalnizca EMIN oldugunda konuluyor: yanlis yeri isaretlemek,
+            # hic isaretlememekten kotu -- kullanici isaretli yeri okuyup
+            # dogru kismi atlar.
+            "parcalar": (
+                vurgu_parcalari(m.get("metin", ""), istek.soru, k)
+                if (istek.vurgu if istek.vurgu is not None else config.VURGU)
+                else []),
         } for m in maddeler],
         "kararlar": [{
             "kisa_ad": kr.get("kisa_ad", ""),

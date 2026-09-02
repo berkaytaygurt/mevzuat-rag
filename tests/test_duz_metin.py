@@ -75,3 +75,23 @@ def test_bos_pdf_baytinda_hata_atmiyor():
     # gereksiz yere kayboluyor.
     from scraper.parser import parse_pdf
     assert parse_pdf(b"", tur_adi="Teblig", mevzuat_no="1", tertip="5") == []
+
+
+def test_guvenli_yaz_atomik(tmp_path):
+    """Yazma yarida kesilse bile eski dosya bozulmamali.
+
+    Dogrudan write_text kullanildiginda 358 MB'lik kulliyat dosyasi bir kez
+    sifirlandi ve 275.806 madde yedekten geri getirilmek zorunda kalindi.
+    """
+    import json
+    import cli
+
+    yol = tmp_path / "veri.json"
+    cli.guvenli_yaz(yol, [{"a": 1}])
+    assert json.loads(yol.read_text(encoding="utf-8")) == [{"a": 1}]
+
+    # Yeniden yazim eskisini bozmadan degistirmeli
+    cli.guvenli_yaz(yol, [{"a": 2}, {"b": 3}])
+    assert len(json.loads(yol.read_text(encoding="utf-8"))) == 2
+    # Gecici dosya arkada birakilmamali
+    assert not list(tmp_path.glob("*.tmp"))

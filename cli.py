@@ -28,6 +28,24 @@ PILOT = [
     ("6698", 1, "5"),   # Kisisel Verilerin Korunmasi Kanunu
 ]
 
+def guvenli_yaz(yol, veri) -> None:
+    """Once gecici dosyaya yazip sonra yer degistirir.
+
+    Dogrudan uzerine yazmak tehlikeli: 358 MB'lik kulliyat dosyasi
+    yazilirken surec olurse ya da iki surec ayni anda yazarsa dosya
+    sifirlaniyor. Bir kez yasandi -- maddeler.json 0 bayta dustu ve
+    275.806 madde ancak yedekten geri getirilebildi.
+
+    os.replace ayni dizin icinde atomik: ya eski dosya ya yeni dosya
+    gorunur, arada bos hal olmaz.
+    """
+    import os
+    gecici = yol.with_suffix(yol.suffix + ".tmp")
+    gecici.write_text(json.dumps(veri, ensure_ascii=False, indent=1),
+                      encoding="utf-8")
+    os.replace(gecici, yol)
+
+
 KATALOG_YOLU = config.RAW_DIR / "katalog.json"
 MADDE_YOLU = config.RAW_DIR / "maddeler.json"
 
@@ -85,9 +103,7 @@ def cmd_cek(args) -> None:
         birlesik = dict(mevcut)
         for m in yeniler:
             birlesik[m["chunk_id"]] = m
-        MADDE_YOLU.write_text(
-            json.dumps(list(birlesik.values()), ensure_ascii=False, indent=1),
-            encoding="utf-8")
+        guvenli_yaz(MADDE_YOLU, list(birlesik.values()))
 
     # Zaten indirilmis belgeleri atla. --yenile-tur ile verilen turler
     # atlanmaz: PDF adresi ya da ayristirici duzeldiginde o turleri yeniden
@@ -143,8 +159,11 @@ def cmd_cek(args) -> None:
             json.dumps(basarisiz, ensure_ascii=False, indent=1), encoding="utf-8")
 
 
-# Demo icin secilen alan: is hukuku. Sebebi, Is Kanunu'nun zaten indekste
-# olmasi -- "kanun + karar" birlesimini gosterebilecegimiz tek alan bu.
+# Baslangicta yalnizca is hukuku vardi (Is Kanunu zaten indekste oldugu
+# icin "kanun + karar" birlesimini gosterebilecegimiz tek alan oydu).
+# 01.09.2026'da alan cesitlendirildi: sistem yalnizca is hukuku sorularinda
+# karar gosterebiliyordu, kira/bosanma/ceza sorularinda karar bolumu bos
+# kaliyordu.
 IS_HUKUKU_ANAHTARLARI = [
     "kıdem tazminatı",
     "ihbar tazminatı",
@@ -156,6 +175,29 @@ IS_HUKUKU_ANAHTARLARI = [
     "asgari ücret",
     "işçilik alacakları",
     "sendika özgürlüğü",
+]
+
+# Ikinci alan: kira hukuku. Once 17 alana yayilmak denendi ama alan basina
+# ~150 karar dusuyordu ve bu, kullaniciya tutarsiz bir sistem gosteriyor --
+# bir soruda karar cikiyor, benzerinde cikmiyor. Bunun yerine TEK bir alani
+# duzgun kapsamak secildi.
+#
+# Kira secildi cunku: siradan insanin en sik karsilastigi ikinci konu, kurali
+# Turk Borclar Kanunu'nda ve o maddeler zaten kulliyatta -- yani atif zinciri
+# de calisiyor.
+KIRA_ANAHTARLARI = [
+    "kira bedelinin tespiti",
+    "kira bedelinin artırılması",
+    "tahliye taahhüdü",
+    "ihtiyaç nedeniyle tahliye",
+    "iki haklı ihtar",
+    "kiralananın tahliyesi",
+    "kira sözleşmesinin feshi",
+    "kiracının temerrüdü",
+    "depozito iadesi",
+    "kiralananda ayıp",
+    "alt kira ve kullanım hakkının devri",
+    "kira sözleşmesinin devri",
 ]
 
 KARAR_YOLU = config.RAW_DIR / "kararlar.json"
@@ -173,11 +215,10 @@ def cmd_ictihat(args) -> None:
         log.info("%d karar zaten var, uzerine ekleniyor", len(hepsi))
 
     def kaydet() -> None:
-        KARAR_YOLU.write_text(
-            json.dumps(list(hepsi.values()), ensure_ascii=False, indent=1),
-            encoding="utf-8")
+        guvenli_yaz(KARAR_YOLU, list(hepsi.values()))
 
-    for kelime in args.anahtar:
+    anahtarlar = KIRA_ANAHTARLARI if args.kira else args.anahtar
+    for kelime in anahtarlar:
         log.info("--- '%s' araniyor ---", kelime)
         kayitlar = istemci.ara(kelime, en_fazla=args.adet)
         log.info("'%s': %d kayit listelendi", kelime, len(kayitlar))
@@ -324,6 +365,8 @@ def main() -> None:
 
     e = alt.add_parser("ictihat", help="mahkeme kararlarini indir")
     e.add_argument("--anahtar", nargs="+", default=IS_HUKUKU_ANAHTARLARI)
+    e.add_argument("--kira", action="store_true",
+                   help="kira hukuku kararlarini indir")
     e.add_argument("--adet", type=int, default=500, help="anahtar basina karar")
     e.add_argument("--gecikme", type=float, default=2.0)
     e.set_defaults(func=cmd_ictihat)

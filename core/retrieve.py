@@ -109,6 +109,9 @@ class Retriever:
         self._reranker = None
         self._yazim = None
         self._genisletici = None
+        self.son_genisletme: str | None = None
+        self.son_vektor_puani: float = 0.0
+        self._ham_puan_sabit: float = 0.0
 
     @property
     def genisletici(self):
@@ -201,6 +204,19 @@ class Retriever:
                    and (kanun_no is None or k.get("mevzuat_no") == kanun_no)]
         return adaylar[:limit]
 
+    def _ham_benzerlik(self, soru: str, mulga_haric: bool = True) -> float:
+        """Kullanicinin ham sorusunun kulliyata en yakin benzerligi.
+
+        Sorunun kulliyatla ilgili olup olmadiginin olcusu budur. Genisletilmis
+        sorgudan olculemez: genisletme hukuk terimleri ekledigi icin alakasiz
+        sorular da yuksek puan aliyor.
+        """
+        v = self.embedder.encode_query(soru)
+        s = self.store.search(v, limit=1, mulga_haric=mulga_haric)
+        puan = s[0]["skor"] if s else 0.0
+        self._ham_puan_sabit = puan
+        return puan
+
     # ---------- birlestirme ----------
     def ara(self, soru: str, limit: int = 5, aday: int | None = None,
             mulga_haric: bool = True) -> list[dict]:
@@ -215,9 +231,29 @@ class Retriever:
         # "orijinal sorgu + hukuk terimleri" donduruyor, yani TEK arama
         # ikisini de kapsiyor. Olculdu -- iki aramali akis sorgu basina
         # 14.3 saniye suruyordu ve 3.4 saniyesi bu atilabilir ilk aramaydi.
+        # Sorgunun nasil anlasildigini disariya aciyoruz. Kullanici
+        # sistemin kendisini dogru anlayip anlamadigini goremezse, bos gelen
+        # bir sonucun sebebini de bilemiyor -- soru mu kotu, kulliyat mi
+        # eksik, ayirt edemiyor.
+        self.son_genisletme = None
         if config.SORGU_GENISLET and config.GENISLET_HEP:
+            # Guven puani KULLANICININ sorusundan olculur, genisletilmisten
+            # degil. Genisletme hukuk terimleri ekliyor ve alakasiz bir soru
+            # da yuksek benzerlik aliyor -- olculdu: "kahve nasil demlenir"
+            # ham sorguda 0.631, genisletilmis sorguda 0.728.
+            ham = self._ham_benzerlik(soru, mulga_haric)
+            self.son_vektor_puani = ham
+            # Guclu sorguda genisletme atlanir: olculdu, genisletme sorgu
+            # basina 4.09 saniye ekliyor ve zaten dogru maddeyi bulan bir
+            # sorguda faydasi yok.
+            if ham >= config.GENISLET_YETER:
+                return self._ara_bir_kez(soru, limit, aday, mulga_haric)
             genis = self.genisletici.genislet(soru)
-            return self._ara_bir_kez(genis, limit, aday, mulga_haric)
+            if genis != soru:
+                self.son_genisletme = genis
+            sonuc = self._ara_bir_kez(genis, limit, aday, mulga_haric)
+            self.son_vektor_puani = self._ham_puan_sabit
+            return sonuc
 
         sonuc = self._ara_bir_kez(soru, limit, aday, mulga_haric)
 
@@ -230,6 +266,7 @@ class Retriever:
         genis = self.genisletici.genislet(soru)
         if genis == soru:                 # genisletme basarisiz oldu
             return sonuc
+        self.son_genisletme = genis
 
         log.debug("zayif sonuc, genisletilmis sorguyla tekrar araniyor")
         yeni = self._ara_bir_kez(genis, limit, aday, mulga_haric)
@@ -283,8 +320,13 @@ class Retriever:
 
         # 2) Anlamsal
         vek = self.embedder.encode_query(soru)
-        ekle(self.store.search(vek, limit=aday, mulga_haric=mulga_haric),
-             agirlik=1.0, kaynak="vektor")
+        vektor_sonuc = self.store.search(vek, limit=aday, mulga_haric=mulga_haric)
+        # En iyi HAM benzerlik, sorunun kulliyatla ilgili olup olmadiginin
+        # olcusu. Yeniden siralayicinin puani bu is icin kullanilamaz --
+        # o, aday havuzu icinde siralama yapar ve havuzda hep bir en iyi
+        # vardir; olculdu, "kahve nasil demlenir" 0.970 aliyor.
+        self.son_vektor_puani = vektor_sonuc[0]["skor"] if vektor_sonuc else 0.0
+        ekle(vektor_sonuc, agirlik=1.0, kaynak="vektor")
 
         # 2b) Cekirdek sorgu: soru kaliplari atilmis hali. Ayri bir sinyal
         # olarak ekleniyor, asil sorgunun yerini almiyor.

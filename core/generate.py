@@ -28,6 +28,12 @@ log = logging.getLogger(__name__)
 #    kendisini cevap sanip "Hirsizligin cezasi nedir?" sorusuna "Isciye en az
 #    on dort gun izin verilir (Is Kanunu m.53)" diye cevap verdi. Bicimi
 #    tarif ediyoruz, gostermiyoruz.
+#
+# 3. kuralin ifadesi olculdu. "Verilen maddeler soruyu cevaplamiyorsa reddet"
+# denildiginde, baglama mahkeme kararlari da eklenince model bes denemenin
+# dordunde reddediyordu -- oysa dogru madde baglamdaydi. Kararlarin soruyu
+# tam karsilamamasi tum cevabi reddetmeye yetiyor. "Bir kismi ilgisiz
+# olabilir, ilgili olani kullan" ifadesiyle red 0/5'e dustu.
 SISTEM = """Sen Türk mevzuatı konusunda yardımcı olan bir asistansın.
 
 Kurallar:
@@ -39,8 +45,9 @@ Kurallar:
    Parantezin içine sana verilen kanunun adını ve madde numarasını yaz.
    Sana verilmeyen bir kanun adı yazma.
 
-3. Verilen maddeler soruyu cevaplamıyorsa şunu yaz ve dur:
-   "Verilen mevzuatta bu soruya dayanak bulamadım." Tahmin yürütme.
+3. Verilen maddelerin bir kısmı soruyla ilgisiz olabilir; ilgili olanları
+   kullan. HİÇBİRİ ilgili değilse şunu yaz ve dur: "Verilen mevzuatta bu
+   soruya dayanak bulamadım." Tahmin yürütme.
 
 4. Bir madde yürürlükten kalkmışsa bunu mutlaka belirt.
 
@@ -49,6 +56,15 @@ Kurallar:
 6. Cevabın EN SONUNA, ayrı bir satır olarak tam şu cümleyi ekle:
    Bu bilgi genel niteliktedir, hukuki görüş yerine geçmez."""
 
+# Kararli istem. ILK SURUM CEVABI BOZUYORDU: mevzuat bolumu dogru maddeyi
+# tasidigi halde model uc denemenin ikisinde "dayanak bulamadim" diyordu
+# (kararsiz istemde sifir). Sebep, iki bolumlu yapinin sistem promptundaki
+# "dayanak yoksa reddet" kuralini one cikarmasiydi -- model kararlarin
+# soruyu tam karsilamadigini gorup tumunu reddediyordu.
+#
+# Duzeltme: mevzuat bolumunun ASIL cevap oldugu, kararlarin yalnizca EK
+# oldugu acikca yaziliyor ve reddetme kurali yalnizca mevzuat bolumu icin
+# gecerli kiliniyor.
 KULLANICI_KARARLI = """Aşağıda sorunun ilgili olabileceği mevzuat maddeleri
 ve bu konuda verilmiş mahkeme kararları var.
 
@@ -62,13 +78,19 @@ ve bu konuda verilmiş mahkeme kararları var.
 
 Soru: {soru}
 
-Önce yalnızca MEVZUAT bölümüne dayanarak cevapla; her cümlenin sonunda kanun
-adını ve madde numarasını parantez içinde göster.
+ASIL CEVAP mevzuat bölümünden gelir. Yukarıdaki maddelerden soruyla ilgili
+olanlara dayanarak cevapla; her cümlenin sonunda kanun adını ve madde
+numarasını parantez içinde göster. Maddelerin tamamı ilgili olmayabilir,
+ilgili olanı kullan.
 
-Sonra "Mahkeme kararları:" başlıklı ayrı bir bölüm ekle ve kararların bu konuda
-ne dediğini en fazla iki cümleyle yaz. Karardaki bir ifadeyi kanun hükmü gibi
-gösterme; kararlar örnektir, bağlayıcı kural maddedir. Kararlar soruyla
-ilgisizse bu bölümü hiç yazma."""
+Yalnızca mevzuat bölümünde soruyla ilgili HİÇBİR madde yoksa "Verilen
+mevzuatta bu soruya dayanak bulamadım." yaz. Kararların soruyu tam
+karşılamaması bu cümleyi yazmak için sebep değildir.
+
+Cevabın ardından "Mahkeme kararları:" başlıklı ayrı bir bölüm ekle ve
+kararların bu konuda ne dediğini en fazla iki cümleyle yaz. Karardaki bir
+ifadeyi kanun hükmü gibi gösterme; kararlar örnektir, bağlayıcı kural
+maddedir. Kararlar ilgisizse bu bölümü hiç yazma."""
 
 
 KULLANICI = """Aşağıda, sorunun ilgili olabileceği mevzuat maddeleri var.
@@ -254,6 +276,9 @@ class Generator:
 
     def cevapla(self, soru: str, maddeler: list[dict],
                 kararlar: list[dict] | None = None) -> str:
+        # Her cagrida sifirlanir; sunucu cevaptan sonra okur.
+        self.son_dogrulama = {"atif_tutuyor": None, "sayi_tutuyor": None,
+                              "uyarilar": [], "madde_sayisi": len(maddeler)}
         if not maddeler:
             return ("Verilen mevzuatta bu soruya dayanak bulamadım.\n\n"
                     "Bu bilgi genel niteliktedir, hukuki görüş yerine geçmez.")
@@ -268,7 +293,8 @@ class Generator:
         cevap = self._gemini(istem) if self.provider == "gemini" else self._local(istem)
 
         uyarilar = []
-        if suphe := atiflari_dogrula(cevap, maddeler):
+        atif_suphesi = atiflari_dogrula(cevap, maddeler)
+        if suphe := atif_suphesi:
             log.warning("dogrulanamayan atif: %s", suphe)
             uyarilar.append("Kaynak gösterimi dayanak maddelerle eşleşmiyor: "
                             + "; ".join(suphe))
@@ -278,11 +304,23 @@ class Generator:
         denetim_baglami = baglam
         if kararlar and config.KARARLARI_CEVABA_KAT:
             denetim_baglami += "\n" + karar_baglami(kararlar)
-        if suphe := sayilari_dogrula(cevap, denetim_baglami):
+        sayi_suphesi = sayilari_dogrula(cevap, denetim_baglami)
+        if suphe := sayi_suphesi:
             log.warning("kaynakta bulunmayan sayi: %s", suphe)
             uyarilar.append("Şu sayılar dayanak maddelerde geçmiyor: "
                             + ", ".join(suphe))
 
+        # Dogrulama sonucu ayrica saklaniyor: cagiran taraf GECEN denetimi de
+        # gosterebilsin. Onceki surum yalnizca hata durumunda konusuyordu;
+        # oysa "bu cevap kaynak metinle dogrulandi" bilgisi de kullaniciya
+        # lazim -- cevabin modelin tahmini mi yoksa metinden mi geldigini
+        # ayirt etmesini saglayan sey bu.
+        self.son_dogrulama = {
+            "atif_tutuyor": not atif_suphesi,
+            "sayi_tutuyor": not sayi_suphesi,
+            "uyarilar": uyarilar,
+            "madde_sayisi": len(maddeler),
+        }
         if uyarilar:
             cevap += "\n\n[!] Doğrulanmalı — " + " | ".join(uyarilar)
         return cevap

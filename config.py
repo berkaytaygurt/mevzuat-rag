@@ -153,3 +153,46 @@ GENISLET_HEP = os.getenv("GENISLET_HEP", "0") not in ("0", "false", "hayir")
 #     gemini-flash-lite-latest   0.6 sn
 # Genisletme kisa bir terim listesi uretiyor; buyuk model gereksiz.
 GEMINI_HIZLI_MODEL = os.getenv("GEMINI_HIZLI_MODEL", "gemini-flash-lite-latest")
+
+# Sorunun kulliyatla ilgili olup olmadigini ayiran esik (KULLANICININ ham
+# sorusunun vektor benzerligi; genisletilmis sorgudan olculemez cunku
+# genisletme hukuk terimleri ekleyip alakasiz sorularin puanini da
+# yukseltiyor -- "kahve nasil demlenir" 0.631'den 0.728'e cikiyor).
+#
+# Olculdu (69 gercek hukuk sorusu + 10 alakasiz soru):
+#
+#     gercek sorular    en dusuk 0.548   ortanca 0.701
+#     alakasiz sorular  en yuksek 0.631  ortanca 0.508
+#
+# Araliklar CAKISIYOR. Esik tablosu:
+#
+#     esik   yanlis engellenen   yakalanan sacma
+#     0.50           0                5/10
+#     0.55           1                6/10
+#     0.60           6                9/10
+#
+# 0.50 secildi: gercek bir soruyu engellemek, sacma bir soruyu kacirmaktan
+# cok daha kotu -- kacan sacma soruyu zaten modelin "bulamadim" kurali
+# yakaliyor. Ilk denemede 0.60 konulmustu ve 69 sorunun 6'sini engelliyordu.
+GUVEN_ESIGI = float(os.getenv("GUVEN_ESIGI", "0.50"))
+
+# Madde metninde soruyla ilgili cumleyi isaretleme. VARSAYILAN KAPALI:
+# olculdu, cross-encoder ile madde basina 3 saniye suruyor (6 madde = 18
+# saniye) ve bu, zaten 6-12 saniye olan sorguyu kullanilamaz hale getiriyor.
+#
+# Isabet olculdu (10 soru): gomme benzerligiyle %60, cross-encoder ile %86.
+# Yani ozellik CALISIYOR, yalnizca pahali. Kullanici istedigi sorguda
+# acabilsin diye istek basina da verilebiliyor (Soru.vurgu).
+VURGU = os.getenv("VURGU", "0") not in ("0", "false", "hayir")
+
+# Sorgu genisletme yalnizca ZAYIF sorgularda calissin. Ham sorgunun vektor
+# benzerligi bu degerin USTUNDEYSE genisletme atlanir.
+#
+# Olculdu: genisletme sorgu basina +4.09 saniye ekliyor (ham arama 0.66,
+# yeniden siralama 0.83). Bu, toplam surenin yarisindan fazlasi. Oysa
+# genisletmenin faydasi zayif sorgularda -- guclu bir sorgu zaten dogru
+# maddeyi buluyor.
+#
+# Gercek soru puanlarinin ortancasi 0.701; 0.72 esigi sorgularin yaklasik
+# yarisini genisletmeden gecirir.
+GENISLET_YETER = float(os.getenv("GENISLET_YETER", "0.72"))
