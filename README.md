@@ -514,6 +514,54 @@ Tek örnekte de doğrulandı: `kıdem tazminatına hak kazanmak için ne kadar
 arasında üç sette de fark yaratmadı (0,724/0,725 — 0,446/0,445 —
 0,250/0,250); varsayılan değiştirilmedi.
 
+## Danıştay kararları (03.09.2026)
+
+Külliyatta yalnızca Yargıtay kararı vardı. Memur, disiplin, atama, mobbing
+gibi uyuşmazlıklar **idari yargıya** gidiyor ve o kararlar Danıştay'da.
+Ölçüldü: *"kadrolu öğretmene mobbing"* sorusunda sistem TBK m.417'yi
+getiriyordu — o hüküm işçi içindir, memura doğrudan uygulanmaz.
+
+**Uç Yargıtay'dan farklı.** Danıştay çoğul ve dizi alanlar bekliyor:
+
+```
+andKelimeler = ["\"mobbing\""]      ← değer tırnak içinde
+orKelimeler, notAndKelimeler, notOrKelimeler
+```
+
+Tekil `andKelime` gönderilince sunucu *"Lütfen arama kriterlerini giriniz!"*
+diyor. Doğru şekil, sitenin kendi betiğindeki `formData` kurulumu okunarak
+bulundu — tahminle değil.
+
+Akış: `POST /arama` (oturumda aramayı kurar) → `POST /aramalist` (liste) →
+`GET /getDokuman?id=&arananKelime=` (tam metin).
+
+**CAPTCHA SINIRI.** Sunucu istediği anda captcha isteyebiliyor ve gece
+tam olarak bunu yaptı: `metadata.FMTE` içinde `DisplayCaptcha` döndü.
+İstemci bu durumda **duruyor** (`CaptchaAcik`); captcha çözülmüyor,
+oturum tazeleyip atlatılmıyor. İlk denetimimiz yalnızca sayfa bayrağına
+baktığı için bu sinyali kaçırdı ve yedi anahtar sessizce "0 kayıt"
+döndü; denetim API mesajını da kapsayacak şekilde düzeltildi.
+
+İlk çekimde 40 mobbing kararı alındı — 2., 12., 8., 5., 10. Daire ve
+İdari Dava Daireleri Kurulu. İçerik doğru yeri dolduruyor: 40 kararın
+17'sinde "memur", 21'inde "disiplin", 12'sinde 657 sayılı Kanun geçiyor.
+
+Karar metni temizliği iki geçişe çıkarıldı: Danıştay iç HTML'i kaçışlı
+gönderiyor ve tek geçişte etiketler metne geri geliyordu.
+
+    python cli.py danistay --adet 150
+
+## Ölçüm günlüğü
+
+Hangi sorgunun yavaş ya da zayıf olduğu ancak gerçek kullanımda görülüyor.
+Her `/api/sor` çağrısı için süre, madde sayısı, ilk sonuç, güven puanı ve
+cevabın üretilip üretilmediği tek satır JSON olarak yazılabiliyor.
+
+**Varsayılan kapalı.** Kayıt soru metnini de tutuyor; site tünelle dışarı
+açıksa başkalarının sorguları da yazılır ve bu, sahibinin bilerek vermesi
+gereken bir karar. `METRIK=1` ile açılır, `data/metrik.jsonl` dosyasına
+yazar. Yazım hatası cevabı engellemiyor.
+
 ## Bilinen sınırlar
 
 **Aday penceresini genişletmek işe yaramıyor.** Ölçüldü: ilk aşama doğru
