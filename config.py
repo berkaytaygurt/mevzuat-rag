@@ -217,3 +217,15 @@ MESELE_AYIR = os.getenv("MESELE_AYIR", "1") not in ("0", "false", "hayir")
 # vermesi gereken bir karar.
 METRIK = os.getenv("METRIK", "0") not in ("0", "false", "hayir")
 METRIK_YOLU = ROOT / "data" / "metrik.jsonl"
+
+
+# --- uzun maddelerin kuyrugu (parent-child) ---
+# Gomme penceresi 512 token; olculdu, maddelerin %17,9'u bunu asiyor ve
+# tum icerigin %22,8'i vektore hic girmiyor. Izole olcum (40 uzun kanun
+# maddesi, saf vektor aramasi): maddenin BASINDAN alinan ifade 36/40
+# bulunuyor, SONUNDAN alinan 13/40.
+#
+# Cocuk parcalar yalnizca pencereye sigmayan kuyrugu kapsiyor; arama
+# cocukta yapilsa da sonuc ANA maddedir. Cocuk indeksi yoksa arama
+# eskisi gibi calisir.
+COCUK_ARAMA = os.getenv("COCUK_ARAMA", "1") not in ("0", "false", "hayir")

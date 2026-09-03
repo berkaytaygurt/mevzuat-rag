@@ -227,6 +227,53 @@ KIRA_ANAHTARLARI = [
     "kira sözleşmesinin devri",
 ]
 
+# Alan bazli anahtar kumeleri. Kulliyatta 6.462 karar vardi ama 21
+# anahtarin hepsi is hukuku ve kira; avukatin sordugu diger her alanda
+# karar bolumu bos kaliyordu. Anahtarlar dava turlerinden secildi, ilgili
+# kanun maddelerinin basliklarindan degil: Yargitay arama motoru karar
+# METNINDE ariyor ve kararlar kendilerini dava adiyla anlatiyor.
+ALAN_ANAHTARLARI = {
+    "aile": [
+        "evlilik birliğinin sarsılması", "velayetin değiştirilmesi",
+        "iştirak nafakası", "yoksulluk nafakası", "katkı payı alacağı",
+        "edinilmiş mallara katılma", "boşanmada manevi tazminat",
+        "ziynet eşyası alacağı",
+    ],
+    "ceza": [
+        "hakaret suçu", "tehdit suçu", "kasten yaralama",
+        "dolandırıcılık suçu", "güveni kötüye kullanma", "hırsızlık suçu",
+        "uyuşturucu madde ticareti", "resmi belgede sahtecilik",
+        "haksız tahrik", "zincirleme suç",
+    ],
+    "icra": [
+        "itirazın iptali", "menfi tespit", "istihkak davası",
+        "ihalenin feshi", "sıra cetveline itiraz", "borca itiraz",
+        "kambiyo senetlerine mahsus haciz",
+    ],
+    "ticaret": [
+        "haksız rekabet", "çek iptali", "kambiyo senedi",
+        "şirket genel kurul kararının iptali", "ortaklıktan çıkarma",
+        "acentelik sözleşmesi", "taşıma sözleşmesi",
+    ],
+    "tazminat": [
+        "haksız fiil tazminatı", "trafik kazası tazminatı",
+        "destekten yoksun kalma tazminatı", "manevi tazminat",
+        "malpraktis tazminatı", "rücu davası",
+    ],
+    "miras": [
+        "tenkis davası", "muris muvazaası", "mirasın reddi",
+        "veraset ilamı", "ortaklığın giderilmesi", "saklı pay",
+    ],
+    "tasinmaz": [
+        "tapu iptali ve tescil", "kat mülkiyeti", "ecrimisil",
+        "kamulaştırmasız el atma", "önalım hakkı", "kat karşılığı inşaat",
+    ],
+    "tuketici": [
+        "ayıplı mal", "ayıplı hizmet", "cayma hakkı",
+        "tüketici kredisi", "abonelik sözleşmesi",
+    ],
+}
+
 KARAR_YOLU = config.RAW_DIR / "kararlar.json"
 
 
@@ -316,7 +363,13 @@ def cmd_ictihat(args) -> None:
     def kaydet() -> None:
         guvenli_yaz(KARAR_YOLU, list(hepsi.values()))
 
-    anahtarlar = KIRA_ANAHTARLARI if args.kira else args.anahtar
+    if args.alan:
+        anahtarlar = [a for alan in args.alan for a in ALAN_ANAHTARLARI[alan]]
+        log.info("%d alandan %d anahtar", len(args.alan), len(anahtarlar))
+    elif args.kira:
+        anahtarlar = KIRA_ANAHTARLARI
+    else:
+        anahtarlar = args.anahtar
     for kelime in anahtarlar:
         log.info("--- '%s' araniyor ---", kelime)
         kayitlar = istemci.ara(kelime, en_fazla=args.adet)
@@ -377,6 +430,54 @@ def cmd_karar_indeksle(args) -> None:
     VektorDeposu(KARAR_INDEX_DIR).kaydet(
         [k.to_dict() for k in parcalar], vektorler / norm)
     log.info("karar indeksi hazir: %d parca -> %s", len(parcalar), KARAR_INDEX_DIR)
+
+
+def cmd_cocuk_indeksle(args) -> None:
+    """Uzun maddelerin kuyrugu icin cocuk vektor indeksi kurar.
+
+    Ana indekse DOKUNMUYOR. Maddenin basi zaten mevcut vektorde
+    kapsandigi icin yalnizca pencereye sigmayan kisim gomuluyor:
+    275 bin maddeyi bastan gommek yerine (~4 saat) ~55 bin cocuk
+    gomuluyor ve mevcut vektorler gecerli kaliyor.
+    """
+    import gc
+
+    import numpy as np
+    from core.cocuk import COCUK_KAYIT, COCUK_VEKTOR, cocuklari_uret
+    from core.embedder import Embedder
+
+    kyol = config.INDEX_DIR / "kayitlar.json"
+    if not kyol.exists():
+        sys.exit("Once 'python cli.py indeksle' calistirin.")
+    kayitlar = json.loads(kyol.read_text(encoding="utf-8"))
+    log.info("%d madde yuklendi", len(kayitlar))
+
+    emb = Embedder()
+    tokenizer = emb.model.tokenizer
+    cocuklar = cocuklari_uret(kayitlar, tokenizer, _embed_metni)
+    if not cocuklar:
+        log.info("pencereyi asan madde yok, cocuk uretilmedi")
+        return
+    log.info("%d maddeden %d cocuk parca", 
+             len({c["ana_chunk_id"] for c in cocuklar}), len(cocuklar))
+    del kayitlar
+    gc.collect()
+
+    metinler = [_embed_metni({**c, "metin": c["cocuk_metin"]}) for c in cocuklar]
+    anahtarlar = [c["ana_chunk_id"] for c in cocuklar]
+    del cocuklar
+    gc.collect()
+
+    vektorler = emb.encode_documents(metinler)
+    norm = np.linalg.norm(vektorler, axis=1, keepdims=True)
+    norm[norm == 0] = 1.0
+    vektorler = (vektorler / norm).astype(np.float32)
+
+    config.INDEX_DIR.mkdir(parents=True, exist_ok=True)
+    np.save(config.INDEX_DIR / COCUK_VEKTOR, vektorler)
+    guvenli_yaz(config.INDEX_DIR / COCUK_KAYIT, anahtarlar)
+    log.info("cocuk indeksi hazir: %d parca -> %s",
+             len(anahtarlar), config.INDEX_DIR / COCUK_VEKTOR)
 
 
 def cmd_bm25(args) -> None:
@@ -548,6 +649,10 @@ def main() -> None:
                    help="degismeyenleri de yeniden gom (varsayilan: artimli)")
     c.set_defaults(func=cmd_indeksle)
 
+    cc = alt.add_parser("cocuk-indeksle",
+                        help="uzun maddelerin kuyrugu icin cocuk vektorleri kur")
+    cc.set_defaults(func=cmd_cocuk_indeksle)
+
     cb = alt.add_parser("bm25", help="yalnizca BM25 indeksini yeniden kur")
     cb.set_defaults(func=cmd_bm25)
 
@@ -564,6 +669,8 @@ def main() -> None:
     e.add_argument("--anahtar", nargs="+", default=IS_HUKUKU_ANAHTARLARI)
     e.add_argument("--kira", action="store_true",
                    help="kira hukuku kararlarini indir")
+    e.add_argument("--alan", nargs="+", choices=sorted(ALAN_ANAHTARLARI),
+                   help="alan bazli anahtar kumesi (aile, ceza, icra, ...)")
     e.add_argument("--adet", type=int, default=500, help="anahtar basina karar")
     e.add_argument("--gecikme", type=float, default=2.0)
     e.set_defaults(func=cmd_ictihat)

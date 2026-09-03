@@ -152,6 +152,8 @@ class Retriever:
         self._reranker = None
         self._yazim = None
         self._genisletici = None
+        self._cocuk = None
+        self._chunk_haritasi: dict[str, dict] | None = None
         self.son_genisletme: str | None = None
         self.son_vektor_puani: float = 0.0
         self._ham_puan_sabit: float = 0.0
@@ -291,6 +293,37 @@ class Retriever:
                "mukerrer": "Mükerrer", "mükerrer": "Mükerrer"}.get(tip.lower(), "")
         no = re.sub(r"\s+", "", no).upper()
         return f"{tip} {no}".strip()
+
+    # ---------- uzun maddelerin kuyrugu ----------
+    @property
+    def cocuk(self):
+        """Cocuk vektor deposu; yoksa arama ana vektorlerle devam eder."""
+        if self._cocuk is None:
+            from .cocuk import CocukDeposu
+            self._cocuk = CocukDeposu()
+        return self._cocuk
+
+    def _kuyruk_sonuclari(self, vek, aday: int, mulga_haric: bool) -> list[dict]:
+        """Cocuk parcalardan gelen ANA madde kayitlari."""
+        try:
+            if not self.cocuk.hazir_mi():
+                return []
+        except Exception as exc:          # cocuk indeksi bir ek, onkosul degil
+            log.debug("cocuk indeksi okunamadi: %s", exc)
+            return []
+
+        if self._chunk_haritasi is None:
+            self._chunk_haritasi = {k.get("chunk_id"): k
+                                    for k in self.store.tum_kayitlar()}
+        sonuc = []
+        for ana, _skor in self.cocuk.ara(vek, limit=aday):
+            k = self._chunk_haritasi.get(ana)
+            if k is None:
+                continue
+            if mulga_haric and k.get("mulga"):
+                continue
+            sonuc.append(k)
+        return sonuc
 
     def _dogrudan_madde(self, soru: str, limit: int = 3) -> list[dict]:
         kanun_no, ad_sonu = self._kanun_bul(soru)
@@ -463,6 +496,15 @@ class Retriever:
         # 2) Anlamsal
         vek = self.embedder.encode_query(soru)
         vektor_sonuc = self.store.search(vek, limit=aday, mulga_haric=mulga_haric)
+
+        # 2a) Uzun maddelerin KUYRUGU. Gomme penceresi 512 token ve
+        # maddelerin %17,9'u bunu asiyor; asan kisim ana vektorde yok.
+        # Olculdu (40 uzun madde, saf vektor): maddenin basindan alinan
+        # ifade 36/40 bulunuyor, sonundan alinan 13/40. Cocuk parcalar
+        # yalnizca kuyrugu kapsiyor; sonuc yine ANA maddedir.
+        if config.COCUK_ARAMA:
+            ekle(self._kuyruk_sonuclari(vek, aday, mulga_haric),
+                 agirlik=1.0, kaynak="kuyruk")
         # En iyi HAM benzerlik, sorunun kulliyatla ilgili olup olmadiginin
         # olcusu. Yeniden siralayicinin puani bu is icin kullanilamaz --
         # o, aday havuzu icinde siralama yapar ve havuzda hep bir en iyi
