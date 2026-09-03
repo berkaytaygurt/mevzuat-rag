@@ -343,7 +343,15 @@ def cmd_karar_indeksle(args) -> None:
     if not KARAR_YOLU.exists():
         sys.exit("Once 'python cli.py ictihat' calistirin.")
     ham = json.loads(KARAR_YOLU.read_text(encoding="utf-8"))
-    log.info("%d karar yuklendi", len(ham))
+    log.info("%d Yargitay karari yuklendi", len(ham))
+
+    # Danistay kararlari AYNI indekse giriyor: kullanici "hangi mahkeme"
+    # diye dusunmuyor, meseleyi soruyor. Ayirt etmek gerektiginde kayitta
+    # "mahkeme" alani var ve kisa_ad zaten "Danistay ..." diye basliyor.
+    if DANISTAY_YOLU.exists():
+        danistay = json.loads(DANISTAY_YOLU.read_text(encoding="utf-8"))
+        log.info("%d Danistay karari yuklendi", len(danistay))
+        ham = ham + danistay
 
     parcalar = [k for kayit in ham for k in parse(kayit)]
     if not parcalar:
