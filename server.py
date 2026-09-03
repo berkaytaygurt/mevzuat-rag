@@ -14,8 +14,10 @@ Sonra tarayicida: http://localhost:8000
 """
 from __future__ import annotations
 
+import json
 import logging
 import secrets
+import time
 from pathlib import Path
 
 from fastapi import Depends, FastAPI, HTTPException, status
@@ -219,11 +221,47 @@ def vurgu_parcalari(metin: str, soru: str, kaynak: dict) -> list[dict]:
         return [{"metin": metin, "vurgu": False}]
 
 
+def metrik_yaz(soru: str, bas: float, maddeler: list, vektor_puani: float,
+               guven_dusuk: bool, karar_sayisi: int, cevap_var: bool) -> None:
+    """Sorgu suresini ve isabet isaretlerini bir satir olarak yazar.
+
+    NEDEN VAR
+    Hangi sorgularin yavas ya da zayif oldugunu ancak gercek kullanimda
+    gorebiliyoruz. Sure ve guven puani kayitli olmazsa "avukat sikayet
+    etti" disinda bir isaret kalmiyor.
+
+    VARSAYILAN KAPALI. Kayit SORU METNINI de tutuyor; site disariya
+    aciksa baskalarinin sorgulari da yazilir ve bu, sahibinin bilerek
+    vermesi gereken bir karar. METRIK=1 ile acilir.
+    """
+    if not config.METRIK:
+        return
+    try:
+        ilk = maddeler[0] if maddeler else {}
+        satir = {
+            "an": time.strftime("%Y-%m-%d %H:%M:%S"),
+            "sure": round(time.time() - bas, 2),
+            "soru": soru[:300],
+            "madde": len(maddeler),
+            "ilk": f"{ilk.get('mevzuat_no', '')} m.{ilk.get('madde_no', '')}",
+            "guven": round(vektor_puani, 3),
+            "guven_dusuk": guven_dusuk,
+            "karar": karar_sayisi,
+            "cevap": cevap_var,
+        }
+        config.METRIK_YOLU.parent.mkdir(parents=True, exist_ok=True)
+        with config.METRIK_YOLU.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(satir, ensure_ascii=False) + "\n")
+    except Exception as exc:      # olcum, cevabi asla engellememeli
+        log.debug("metrik yazilamadi: %s", exc)
+
+
 @app.post("/api/sor")
 def sor(istek: Soru):
     if not istek.soru.strip():
         return JSONResponse({"hata": "Soru bos"}, status_code=400)
 
+    bas = time.time()
     k = kaynaklar()
     maddeler = k["retriever"].ara(istek.soru, limit=istek.k,
                                  mulga_haric=istek.mulga_haric)
@@ -270,6 +308,9 @@ def sor(istek: Soru):
         except Exception as exc:
             cevap_hatasi = str(exc)
             log.warning("cevap uretilemedi: %s", exc)
+
+    metrik_yaz(istek.soru, bas, maddeler, vektor_puani, guven_dusuk,
+               len(kararlar), bool(cevap))
 
     return {
         "soru": istek.soru,

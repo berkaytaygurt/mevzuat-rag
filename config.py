@@ -205,3 +205,15 @@ GENISLET_YETER = float(os.getenv("GENISLET_YETER", "0.72"))
 # vektor bu uc meselenin bulanik ortalamasi oluyor; sistem hicbirinin
 # maddesini bulamayip "dayanak bulamadim" diyordu.
 MESELE_AYIR = os.getenv("MESELE_AYIR", "1") not in ("0", "false", "hayir")
+
+
+# --- olcum gunlugu ---
+# Hangi sorgunun yavas ya da zayif oldugunu ancak gercek kullanimda
+# gorebiliyoruz; sure ve guven puani kayitli olmazsa elimizde "avukat
+# sikayet etti" disinda isaret kalmiyor.
+#
+# VARSAYILAN KAPALI. Kayit SORU METNINI de tutuyor ve site disariya
+# aciksa baskalarinin sorgulari da yazilir; bu, sahibinin bilerek
+# vermesi gereken bir karar.
+METRIK = os.getenv("METRIK", "0") not in ("0", "false", "hayir")
+METRIK_YOLU = ROOT / "data" / "metrik.jsonl"
