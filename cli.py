@@ -255,7 +255,17 @@ def cmd_danistay(args) -> None:
     """
     from scraper.danistay import DanistayClient, CaptchaAcik
 
-    istemci = DanistayClient(delay=args.gecikme)
+    # Istemci kurulurken de captcha cikabiliyor (acilis sayfasinda bayrak
+    # aciksa). Kurulum try'in DISINDA kalirsa komut yigin iziyle cokuyor;
+    # oysa bu bir hata degil, sunucunun "su an olmaz" demesi.
+    try:
+        istemci = DanistayClient(delay=args.gecikme)
+    except CaptchaAcik as exc:
+        log.error("DURDURULDU: %s", exc)
+        log.error("Danistay su an captcha istiyor. Captcha cozulmuyor; "
+                  "bir sure sonra yeniden deneyin.")
+        return
+
     hepsi: dict[str, dict] = {}
     if DANISTAY_YOLU.exists():          # yarim kalmis indirmeyi surdur
         for k in json.loads(DANISTAY_YOLU.read_text(encoding="utf-8")):
