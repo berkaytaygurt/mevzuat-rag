@@ -155,6 +155,7 @@ class Retriever:
         self._cocuk = None
         self._chunk_haritasi: dict[str, dict] | None = None
         self.son_genisletme: str | None = None
+        self.son_hyde: str | None = None
         self.son_vektor_puani: float = 0.0
         self._ham_puan_sabit: float = 0.0
         self.son_meseleler: list[str] = []
@@ -369,6 +370,29 @@ class Retriever:
         # bir sonucun sebebini de bilemiyor -- soru mu kotu, kulliyat mi
         # eksik, ayirt edemiyor.
         self.son_genisletme = None
+        self.son_hyde = None
+
+        # HyDE: soruyu once kanun diline cevirip oyle ara. Olculdu (34 soru):
+        # ham sorgu MRR 0,734 -> kisa HyDE 0,956, 1. sirada 23/34 -> 32/34.
+        #
+        # IKI TUZAK:
+        # 1. Madde atifli sorgularda ("TBK 344") devreye GIRMEZ; orada soru
+        #    zaten kesin bir adres ve HyDE onu bozar.
+        # 2. Guven puani yine ORIJINAL sorudan olculur. HyDE metni kanun
+        #    diliyle yazildigi icin kulliyata her zaman yakin cikar; alakasiz
+        #    bir soruda bile yuksek benzerlik verir ve guven esigi calismaz.
+        if config.HYDE and not self._atif_sorgusu(soru):
+            from .hyde import varsayimsal_hukum
+
+            sahte = varsayimsal_hukum(soru, self.genisletici.uretici)
+            if sahte:
+                self.son_hyde = sahte
+                ham = self._ham_benzerlik(soru, mulga_haric)
+                sonuc = self._ara_bir_kez(sahte, limit, aday, mulga_haric,
+                                          dogrudan_soru=soru)
+                self.son_vektor_puani = ham
+                return sonuc
+
         if config.SORGU_GENISLET and config.GENISLET_HEP:
             # Guven puani KULLANICININ sorusundan olculur, genisletilmisten
             # degil. Genisletme hukuk terimleri ekliyor ve alakasiz bir soru
@@ -461,8 +485,19 @@ class Retriever:
             return True
         return self._en_iyi_puan(sonuc) < config.GENISLET_ESIK
 
+    @staticmethod
+    def _atif_sorgusu(soru: str) -> bool:
+        """Sorgu bir madde atfi mi ("TBK 344", "4857 madde 19").
+
+        Boyle sorgularda HyDE devreye girmemeli: soru zaten kesin bir
+        adres ve varsayimsal hukum metni o adresi yok eder.
+        """
+        kanun, sonu = Retriever._kanun_bul(soru)
+        return kanun is not None and Retriever._madde_bul(soru, sonu) is not None
+
     def _ara_bir_kez(self, soru: str, limit: int, aday: int | None,
-                     mulga_haric: bool) -> list[dict]:
+                     mulga_haric: bool,
+                     dogrudan_soru: str | None = None) -> list[dict]:
         # Yeniden siralama acikken ilk asama daha genis aday toplamali:
         # cross-encoder yalnizca onune gelen adaylari siralayabilir, pencereye
         # hic girmemis bir maddeyi kurtaramaz.
@@ -489,8 +524,10 @@ class Retriever:
                 giris["skor"] += agirlik / (60 + rank)   # RRF
                 giris["kaynaklar"].append(kaynak)
 
-        # 1) Dogrudan madde numarasi -- en guvenilir, en yuksek agirlik
-        dogrudan = self._dogrudan_madde(soru)
+        # 1) Dogrudan madde numarasi -- en guvenilir, en yuksek agirlik.
+        # ORIJINAL soru kullanilir: HyDE devredeyse "soru" degistirilmis
+        # olur ve icinde madde numarasi kalmaz.
+        dogrudan = self._dogrudan_madde(dogrudan_soru or soru)
         ekle(dogrudan, agirlik=3.0, kaynak="madde_no")
 
         # 2) Anlamsal

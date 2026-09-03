@@ -229,3 +229,14 @@ METRIK_YOLU = ROOT / "data" / "metrik.jsonl"
 # cocukta yapilsa da sonuc ANA maddedir. Cocuk indeksi yoksa arama
 # eskisi gibi calisir.
 COCUK_ARAMA = os.getenv("COCUK_ARAMA", "1") not in ("0", "false", "hayir")
+
+
+# --- HyDE ---
+# Soruyu once kanun diline cevirip oyle aramak. Olculdu (34 soru):
+#     ham sorgu                     1. sirada 23/34   MRR 0,734   1,6 sn
+#     KISA HyDE (1 cumle, 154 kar.) 1. sirada 32/34   MRR 0,956   4,7 sn
+# Uzun HyDE hem yavas hem daha kotu: 550 karakterlik metin ~80 arama
+# terimi demek ve BM25 275 bin belgeyi o kadar terimle tariyor.
+#
+# Madde atifli sorgularda ("TBK 344") devreye girmez.
+HYDE = os.getenv("HYDE", "1") not in ("0", "false", "hayir")
