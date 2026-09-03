@@ -220,7 +220,7 @@ class DanistayClient:
         if onbellek.exists():
             return json.loads(onbellek.read_text(encoding="utf-8")).get("metin", "")
 
-        ham = ""
+        ham, son_hata = "", None
         for _ in range(3):
             self._bekle()
             try:
@@ -236,7 +236,13 @@ class DanistayClient:
             except CaptchaAcik:
                 raise
             except requests.RequestException as exc:
-                log.debug("belge hatasi (%s): %s", karar_id, exc)
+                son_hata = exc
+        if not ham:
+            # GORUNUR olmali: bu dal debug seviyesindeyken belgeler sessizce
+            # bos donuyordu ve "150 kayittan 34'u kaldi" tablosunun sebebi
+            # gorunmuyordu.
+            log.warning("belge alinamadi (%s): %s", karar_id,
+                        str(son_hata)[:90] if son_hata else "bos cevap")
         if ham:
             onbellek.write_text(json.dumps({"metin": ham}, ensure_ascii=False),
                                 encoding="utf-8")
