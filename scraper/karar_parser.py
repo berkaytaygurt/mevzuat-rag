@@ -99,7 +99,13 @@ def html_metne(ham: str) -> str:
     """Karar HTML'ini duz metne cevirir, satir yapisini koruyarak."""
     if not ham:
         return ""
-    metin = re.sub(r"<\s*(br|/p|/div|/tr|/li)[^>]*>", "\n", ham, flags=re.IGNORECASE)
+    # style/script GOVDESI de atilmali: yalnizca etiketi silmek yetmiyor,
+    # icerigi metne karisiyor. Danistay belgeleri sayfayi bir stil bloguyla
+    # sariyor ve metin ".highlight { background-color: yellow; }" diye
+    # basliyordu.
+    metin = re.sub(r"<\s*(style|script)[^>]*>.*?<\s*/\s*\1\s*>", " ", ham,
+                   flags=re.IGNORECASE | re.DOTALL)
+    metin = re.sub(r"<\s*(br|/p|/div|/tr|/li)[^>]*>", "\n", metin, flags=re.IGNORECASE)
     metin = re.sub(r"<[^>]+>", " ", metin)
     for kacan, karsilik in (("&nbsp;", " "), ("&amp;", "&"), ("&quot;", '"'),
                             ("&lt;", "<"), ("&gt;", ">"), ("&#39;", "'")):

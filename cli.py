@@ -230,6 +230,68 @@ KIRA_ANAHTARLARI = [
 KARAR_YOLU = config.RAW_DIR / "kararlar.json"
 
 
+# Idari yargi anahtarlari. Kulliyatta yalnizca Yargitay karari vardi;
+# memur, disiplin, atama, mobbing gibi uyusmazliklar idari yargiya gidiyor
+# ve o kararlar Danistay'da. Olculdu: "kadrolu ogretmene mobbing" sorusunda
+# sistem TBK m.417'yi getiriyordu, oysa o hukum ISCI icin.
+IDARI_ANAHTARLAR = [
+    "mobbing",
+    "disiplin cezası",
+    "kademe ilerlemesinin durdurulması",
+    "görevden uzaklaştırma",
+    "naklen atama",
+    "atama iptali",
+    "disiplin soruşturması",
+    "aylıktan kesme cezası",
+]
+
+DANISTAY_YOLU = config.RAW_DIR / "danistay_kararlar.json"
+
+
+def cmd_danistay(args) -> None:
+    """Danistay kararlarini indirir.
+
+    Captcha acilirsa DURUR: bot denetimini atlatmaya calismiyoruz.
+    """
+    from scraper.danistay import DanistayClient, CaptchaAcik
+
+    istemci = DanistayClient(delay=args.gecikme)
+    hepsi: dict[str, dict] = {}
+    if DANISTAY_YOLU.exists():          # yarim kalmis indirmeyi surdur
+        for k in json.loads(DANISTAY_YOLU.read_text(encoding="utf-8")):
+            hepsi[k["id"]] = k
+        log.info("%d Danistay karari zaten var", len(hepsi))
+
+    def kaydet() -> None:
+        guvenli_yaz(DANISTAY_YOLU, list(hepsi.values()))
+
+    try:
+        for kelime in args.anahtar:
+            log.info("--- Danistay '%s' ---", kelime)
+            kayitlar = istemci.ara(kelime, en_fazla=args.adet)
+            log.info("'%s': %d kayit listelendi", kelime, len(kayitlar))
+            for i, kayit in enumerate(kayitlar, 1):
+                if kayit.id in hepsi:
+                    continue
+                kayit.metin = istemci.belge(kayit.id, kelime)
+                if not kayit.metin:
+                    continue
+                hepsi[kayit.id] = kayit.to_dict()
+                if i % 25 == 0:
+                    kaydet()
+                    log.info("  [%s] %d/%d (toplam %d)", kelime, i,
+                             len(kayitlar), len(hepsi))
+            kaydet()
+    except CaptchaAcik as exc:
+        kaydet()
+        log.error("DURDURULDU: %s", exc)
+        log.error("Captcha cozulmuyor. %d karar kaydedildi.", len(hepsi))
+        return
+
+    kaydet()
+    log.info("toplam %d Danistay karari -> %s", len(hepsi), DANISTAY_YOLU)
+
+
 def cmd_ictihat(args) -> None:
     from scraper.ictihat import EmsalClient
 
@@ -386,7 +448,10 @@ def _onceki_vektorler(metinler: list[str]):
     if not (vyol.exists() and kyol.exists()):
         return None, None
     eski_kayit = json.loads(kyol.read_text(encoding="utf-8"))
-    eski_vek = np.load(vyol)
+    # mmap: eski matris 1.13 GB. Tumuyle bellege almak gereksiz, yalnizca
+    # yeniden kullanilan satirlar kopyalanacak. Bellek tepesini bu kadar
+    # dusuruyor -- indeksleme bir kez MemoryError ile cokmustu.
+    eski_vek = np.load(vyol, mmap_mode="r")
     if len(eski_kayit) != len(eski_vek):
         log.warning("onceki indeks tutarsiz, bastan gomulecek")
         return None, None
@@ -470,6 +535,12 @@ def main() -> None:
 
     ki = alt.add_parser("karar-indeksle", help="kararlari ayri indekse yaz")
     ki.set_defaults(func=cmd_karar_indeksle)
+
+    dn = alt.add_parser("danistay", help="Danistay kararlarini indir")
+    dn.add_argument("--anahtar", nargs="+", default=IDARI_ANAHTARLAR)
+    dn.add_argument("--adet", type=int, default=200, help="anahtar basina karar")
+    dn.add_argument("--gecikme", type=float, default=2.0)
+    dn.set_defaults(func=cmd_danistay)
 
     e = alt.add_parser("ictihat", help="mahkeme kararlarini indir")
     e.add_argument("--anahtar", nargs="+", default=IS_HUKUKU_ANAHTARLARI)
