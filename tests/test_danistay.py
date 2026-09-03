@@ -78,3 +78,19 @@ def test_api_captcha_mesaji_yakalaniyor():
 def test_normal_hata_captcha_sayilmiyor():
     DanistayClient._captcha_denetle(
         '{"data":null,"metadata":{"FMTE":"Lütfen arama kriterlerini giriniz!"}}')
+
+
+def test_kacisli_ic_html_metne_geri_gelmiyor():
+    """Danistay ic HTML'i KACISLI gonderiyor.
+
+    Tek gecisli temizlikte once etiketler siliniyor, sonra kacislar
+    cozulup etiketler metne GERI geliyordu; karar metni
+    "<html><head><meta http-equiv=..." diye basliyordu.
+    """
+    ham = ("<body>Karar İçeriği &lt;html&gt;&lt;head&gt;"
+           "&lt;meta charset=&quot;utf-8&quot;&gt;&lt;/head&gt;"
+           "&lt;body&gt;Danıştay 2. Daire kararı&lt;/body&gt;&lt;/html&gt;</body>")
+    m = html_metne(ham)
+    assert "<html>" not in m, m
+    assert "<meta" not in m
+    assert "Danıştay 2. Daire kararı" in m

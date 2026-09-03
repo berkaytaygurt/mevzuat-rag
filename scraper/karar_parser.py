@@ -99,17 +99,25 @@ def html_metne(ham: str) -> str:
     """Karar HTML'ini duz metne cevirir, satir yapisini koruyarak."""
     if not ham:
         return ""
-    # style/script GOVDESI de atilmali: yalnizca etiketi silmek yetmiyor,
-    # icerigi metne karisiyor. Danistay belgeleri sayfayi bir stil bloguyla
-    # sariyor ve metin ".highlight { background-color: yellow; }" diye
-    # basliyordu.
-    metin = re.sub(r"<\s*(style|script)[^>]*>.*?<\s*/\s*\1\s*>", " ", ham,
-                   flags=re.IGNORECASE | re.DOTALL)
-    metin = re.sub(r"<\s*(br|/p|/div|/tr|/li)[^>]*>", "\n", metin, flags=re.IGNORECASE)
-    metin = re.sub(r"<[^>]+>", " ", metin)
-    for kacan, karsilik in (("&nbsp;", " "), ("&amp;", "&"), ("&quot;", '"'),
-                            ("&lt;", "<"), ("&gt;", ">"), ("&#39;", "'")):
-        metin = metin.replace(kacan, karsilik)
+    # IKI GECIS. Danistay belgeleri ic HTML'i KACISLI gonderiyor
+    # (&lt;html&gt;&lt;head&gt;...). Tek gecis yapinca once etiketler
+    # siliniyor, sonra kacislar cozulup etiketler metne GERI geliyordu ve
+    # karar metni "<html><head><meta http-equiv=..." diye basliyordu.
+    #
+    # style/script GOVDESI de atilmali; yalnizca etiketi silmek yetmiyor,
+    # icerigi metne karisiyor (".highlight { background-color: yellow; }").
+    metin = ham
+    for _ in range(2):
+        metin = re.sub(r"<\s*(style|script)[^>]*>.*?<\s*/\s*\1\s*>", " ", metin,
+                       flags=re.IGNORECASE | re.DOTALL)
+        metin = re.sub(r"<\s*(br|/p|/div|/tr|/li)[^>]*>", "\n", metin,
+                       flags=re.IGNORECASE)
+        metin = re.sub(r"<[^>]+>", " ", metin)
+        for kacan, karsilik in (("&nbsp;", " "), ("&amp;", "&"), ("&quot;", '"'),
+                                ("&lt;", "<"), ("&gt;", ">"), ("&#39;", "'")):
+            metin = metin.replace(kacan, karsilik)
+        if "<" not in metin:
+            break
     metin = re.sub(r"[ \t]+", " ", metin)
     return re.sub(r"\n\s*\n+", "\n", metin).strip()
 
