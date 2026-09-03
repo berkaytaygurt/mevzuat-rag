@@ -384,12 +384,17 @@ Kanunlar yeniden çekildi (907 belge). Metin hacmi:
 Aynı 34 soruluk set, aynı ayarlarla iki külliyat üzerinde koşuldu (eski
 külliyat ayrı bir indekse kurulup ölçüldü):
 
-| | eski külliyat | yeni külliyat |
-|---|---|---|
-| 1. sırada | 14/34 (%41) | **23/34 (%68)** |
-| ilk 3'te | 20/34 | **26/34** |
-| ilk 5'te | 24/34 (%71) | **29/34 (%85)** |
-| MRR | 0,524 | **0,748** |
+| | eski külliyat | yalnız kanunlar düzeltilmiş | tüm külliyat düzeltilmiş |
+|---|---|---|---|
+| 1. sırada | 14/34 (%41) | 23/34 (%68) | **23/34 (%68)** |
+| ilk 3'te | 20/34 | 26/34 | 25/34 |
+| ilk 5'te | 24/34 (%71) | 29/34 (%85) | 27/34 (%79) |
+| MRR | 0,524 | 0,748 | **0,734** |
+
+Son sütun, tebliğ ve yönetmelikler de yeniden ayrıştırıldıktan sonrası.
+MRR 0,748'den 0,734'e indi: iki soru geriledi (biri 5→6, biri 2→bulunamadı),
+kalan 32 soru aynı. 34 soruluk bir sette tek soru 0,029 MRR demek, yani bu
+fark gürültü sınırında — ama düşüş olduğu için yazıyoruz.
 
 14 soru iyileşti, 3 soru birer sıra geriledi (3→5, 5→6, 5→6). Daha önce hiç
 bulunamayan 5 soru artık bulunuyor. Sorunu ortaya çıkaran avukat sorusu m.19'u
@@ -513,6 +518,65 @@ Tek örnekte de doğrulandı: `kıdem tazminatına hak kazanmak için ne kadar
 "Geçici 11" gibi maddelerin öne geçtiği görülmüştü. Ceza 0,00 ile 0,05
 arasında üç sette de fark yaratmadı (0,724/0,725 — 0,446/0,445 —
 0,250/0,250); varsayılan değiştirilmedi.
+
+## Madde numarasıyla arama (03.09.2026'da düzeltildi)
+
+Avukatın en sık yapacağı arama yanlış kanunu getiriyordu:
+
+```
+"4857 madde 19"  → 5285 m.19      (doğru numara, YANLIŞ kanun)
+"TMK 166"        → 5905 m.166
+"TBK 344"        → 6102 m.344
+```
+
+İki sebep vardı. Kanun ancak "sayılı" kelimesi geçerse tanınıyordu ve
+kısaltma listesi kanun **adlarını** ("İş Kanunu") hiç içermiyordu; kanun
+tanınamayınca kod yalnızca madde numarasına bakıp rastgele bir kanunun
+maddesini döndürüyordu — üstelik bu yol RRF'te en yüksek ağırlığı (3.0)
+taşıdığı için doğruca 1. sıraya çıkıyordu.
+
+Ayrıca bulunan madde artık listenin başına **sabitleniyor**: böyle bir
+sorguda anlamsal içerik olmadığı için cross-encoder maddeyi aşağı
+itiyordu. Ölçüldü — dokuz atıf biçiminin dokuzu da 1. sırada:
+
+    4857 madde 19 · İş Kanunu 19. madde · TBK 344 · 2576 madde 3/A
+    TMK 166 · TCK m.125 · 6098 sayılı kanun madde 344
+    türk medeni kanunu 166. madde · TMK 166 maddesi
+
+Yazım sözlüğünde de bir bozukluk çıktı: Python'un `lower()` metodu Türkçe
+"İ" harfini "i" + görünmez birleşik noktaya bölüyor. Kanun başlıkları
+BÜYÜK yazıldığı için sözlüğün 106.559 kelimesinden 2.411'i bu bozuk
+biçimdeydi ("yönetmeliği", "tebliği", "ithalatta" dahil) ve düzeltici
+sorguya görünmez karakter sokuyordu.
+
+## Netleştirme: olay anlatımını meseleye çevirme
+
+Ölçüldü — aynı mesele dört ayrı biçimde soruldu, beş hukuk alanında:
+
+| Nasıl yazılmış | 1. sırada | MRR |
+|---|---|---|
+| Olay anlatımı (uzun, olgulu) | 1/5 | 0,32 |
+| Doğal soru cümlesi | 4/5 | 0,83 |
+| Hukuki kavram (kısa) | 5/5 | 1,00 |
+
+Sistem, avukatın en doğal yazma biçiminde çalışkan değil. Ama avukattan
+"kavram gibi yaz" diye beklemek de doğru değil; o ne istediğini bilir,
+nasıl ifade edeceğini bilmez.
+
+`/api/netlestir` bu farkı kapatıyor: olay anlatımı mesele başlıklarına
+çevriliyor, kullanıcı hangisini sorduğunu **seçiyor**, arama seçilen
+başlıkla yapılıyor. Ölçüldü: beş olayın beşinde de sunulan başlıklardan
+en az biri doğru maddeyi 1. sıraya getiriyor (MRR 1,00).
+
+Kısa ve net sorgularda ekran hiç gösterilmiyor.
+
+## Akıllı vurgu maliyeti — ölçülen
+
+Vurgu varsayılan açık. Maliyet **ölçüldü**: 10 madde için toplam 0,9
+saniye (madde başına 0,09 sn). Önceki tahmin "madde başına 1-3 saniye"
+idi ve yanlıştı — o ölçüm, yeniden sıralayıcı modeli daha yüklenirken ve
+makine başka işlerle meşgulken alınmıştı. Model bir kez yüklendikten
+sonra vurgu ucuz.
 
 ## Danıştay kararları (03.09.2026)
 
