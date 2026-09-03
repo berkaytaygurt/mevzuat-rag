@@ -48,18 +48,18 @@ eğitilmiş model yine kaynak gösteremez.
 
 ## Elimizde ne var
 
-**275.806 madde.** 10.601 belge — kanunlar, tüzükler, yönetmelikler,
+**~275.000 madde.** ~11.850 belge — kanunlar, tüzükler, yönetmelikler,
 tebliğler. Kağıda dökülse yaklaşık 99.600 sayfa.
 
-Kanunların %99'u var. Yönetmelik ve tebliğlerde kapsam %66-82 arasında;
-sitenin listeleri yarıda kesmesi ve belge adreslerinin türden türe değişmesi
-yüzünden bir kısmı alınamadı. Kanun hükmünde kararnameler siteden hiç
-sunulmuyor.
+Katalog eksiği (belge adreslerinin türden türe değişmesi ve listenin yarıda
+kesilmesi) sonradan bulunup düzeltildi; ayrıntı için README'deki "Külliyat
+eksikleri" bölümü. Kanun hükmünde kararnameler siteden hiç sunulmuyor.
 
-**2.890 Yargıtay kararı.** Hepsi iş hukuku — 9., 22. ve 7. Hukuk Daireleri.
-Kararlar maddelerden ayrı tutuluyor ve cevapta ayrı bir bölüm olarak
-gösteriliyor. Sebebi basit: karar bağlayıcı kural değil, kuralın bir olayda
-nasıl uygulandığının örneği. İkisi karışmamalı.
+**~30.800 mahkeme kararı.** ~30.400'ü Yargıtay (9., 22. ve 7. Hukuk Daireleri
+— iş hukuku), ~400'ü Danıştay (memur, disiplin, atama, mobbing gibi idari
+uyuşmazlıklar). Kararlar maddelerden ayrı tutuluyor ve cevapta ayrı bir bölüm
+olarak gösteriliyor. Sebebi basit: karar bağlayıcı kural değil, kuralın bir
+olayda nasıl uygulandığının örneği. İkisi karışmamalı.
 
 ---
 
@@ -137,6 +137,12 @@ süre kullanılamaz göründü çünkü 22 saniye sürüyordu. Sonra anlaşıld�
 tasarımda değil, seçilen modelde — küçük bir model aynı işi 48 kat hızlı
 yapıyor. Şimdi 1,6 saniye.
 
+**Sonraki adım — HyDE:** sorguyu terimlere çevirmek yerine, sorunun cevabı
+olacak varsayımsal bir hüküm cümlesi ürettirip aramayı o cümleyle yapmak
+(soru ile kanun metnini aynı dile getiriyor). Ölçülen isabet MRR 0,73'ten
+0,919'a çıktı, 34 sorunun 32'si 1. sırada. Ayrıntı ve tuzaklar için
+README'deki "Güncel Ölçümler" bölümü ve `core/hyde.py`.
+
 ---
 
 ## Yol boyunca bulunanlar
@@ -175,10 +181,12 @@ alanlarda fark yok, ve bunu gösteren bir ölçüm de yapılmadı.
 
 **Eksik olanlar:**
 
-- Doğal dilde arama hâlâ zayıf. Çözüm bulundu ama tam oturmadı.
-- İçtihat yalnızca iş hukukunda. Kira, boşanma, ceza yok.
-- Kapsam %73. Aradığınız tebliğ dörtte bir ihtimalle sistemde yok — ve sistem
-  bunu size söyleyemiyor.
+- Doğal dilde arama hâlâ zayıf, HyDE ile büyük ölçüde iyileşti ama tam
+  kapanmadı (bkz. README "Doğal dilde arama — ölçülen zayıflık").
+- İçtihat iş hukuku (Yargıtay) ve idari yargıdan (Danıştay: memur, disiplin,
+  mobbing) ibaret. Kira, boşanma, ceza yok.
+- Kapsam tam değil. Bazı yönetmelik ve tebliğler hâlâ sistemde olmayabilir —
+  ve sistem bunu size söyleyemiyor.
 - **Hiçbir avukat denemedi.** Değerli olduğunu ölçtük, gerçekten
   kullanılabilir olduğunu bilmiyoruz.
 
@@ -191,9 +199,9 @@ sorudan daha çok şey öğretir.
 
 | | |
 |---|---|
-| Madde | 275.806 |
-| Belge | 10.601 |
-| Mahkeme kararı | 2.890 |
+| Madde | ~275.000 |
+| Belge | ~11.850 |
+| Mahkeme kararı | ~30.800 |
 | Arama süresi | ~2 saniye |
 | Cevap süresi | ~5 saniye |
 | Otomatik test | 132 |
