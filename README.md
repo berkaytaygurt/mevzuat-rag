@@ -8,6 +8,29 @@ cevaplanır.
 > Bu araç genel bilgi verir, **hukuki görüş yerine geçmez**. Çıktıyı bir
 > avukata danışmadan karar dayanağı yapmayın.
 
+## Güncel Ölçümler
+
+En son ölçülen arama isabeti, 34 soruluk ölçüm setinde (`tests/olcum_seti.py`):
+
+| Yöntem | 1. sırada | MRR |
+|---|---|---|
+| Ham sorgu | — | 0,73 |
+| + HyDE (varsayımsal hüküm ile arama) | 32/34 | 0,919 |
+| + parent-child (uzun madde kuyruğu) | — | **0,925** |
+
+Bu dönemde ayrıca eklenenler:
+
+- **Danıştay kararları** — memur, disiplin, atama ve mobbing gibi idari
+  uyuşmazlıklar için 40 mobbing kararı indekslendi (03.09.2026), bkz.
+  [Danıştay kararları](#danıştay-kararları-03092026)
+- **Netleştirme** — olay anlatımının meseleye çevrilmesi, MRR 0,32 → 1,00,
+  bkz. [Netleştirme: olay anlatımını meseleye çevirme](#netleştirme-olay-anlatımını-meseleye-çevirme)
+- **Akıllı vurgu maliyeti** — madde başına ölçülen maliyet 0,09 sn, bkz.
+  [Akıllı vurgu maliyeti](#akıllı-vurgu-maliyeti--ölçülen)
+
+Yöntemlerin nasıl çalıştığı ve sınırları için `core/hyde.py` ve
+`core/cocuk.py`.
+
 ## Ne işe yarıyor — ölçülmüş sonuç
 
 Asıl soru: bu sistemi kurmak yerine doğrudan bir dil modeline sorsak ne olur?
@@ -286,6 +309,20 @@ Eklenen her katmanın ölçülen katkısı (ASCII sorgular):
 
 MRR (ortalama karşılıklı sıra) tek başına en bilgilendirici olan; "ilk 5'te
 var" ifadesi 1. sırada olmakla 5. sırada olmak arasındaki farkı gizler.
+
+HyDE ve parent-child eklendikten sonraki ölçüm:
+
+| Aşama | 1. sırada | MRR |
+|---|---|---|
+| Ham sorgu | — | 0,730 |
+| + HyDE (`core/hyde.py`) | 32/34 | 0,919 |
+| + parent-child (`core/cocuk.py`) | — | **0,925** |
+
+HyDE, soruyu doğrudan gömmek yerine önce soruyu cevaplayan varsayımsal bir
+hüküm cümlesi ürettirip aramayı o cümleyle yapıyor — soru ile kanun metni
+arasındaki dil farkını kapatıyor. Parent-child ise yalnızca gömme
+penceresini (512 token) aşan maddelerin kuyruğu için çocuk parça üretiyor;
+arama çocukta yapılıyor, kullanıcıya madde tamamı dönüyor.
 
 Yeniden sıralama her iki yazım biçiminde de kazandırıyor (%20-23) ve sorgu
 başına yalnızca 0,34 saniye ekliyor (0,70 → 1,04 sn, model yükleme hariç).
