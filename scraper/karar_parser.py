@@ -69,6 +69,7 @@ class Karar:
     anahtar: str
     gerekce: str                 # indekslenen parca
     tam_metin: str               # kullaniciya gosterilen tam karar
+    mahkeme: str = "Yargıtay"    # Danistay kararlari da ayni indekste
     parca_no: int = 1            # ayni karardan kacinci parca
     parca_adet: int = 1
 
@@ -80,7 +81,17 @@ class Karar:
 
     @property
     def kisa_ad(self) -> str:
-        ad = f"{self.daire} {self.esas_no} E. {self.karar_no} K.".strip()
+        """Kullaniciya gosterilen atif.
+
+        MAHKEME ADI SART: Yargitay ve Danistay kararlari ayni listede
+        gorunuyor ve daire adlari birbirine benziyor ("8. Daire" Danistay,
+        "9. Hukuk Dairesi" Yargitay). Mahkeme yazilmayinca avukat hangi
+        yargi kolundan bahsedildigini ayirt edemiyor.
+        """
+        daire = self.daire
+        if self.mahkeme and not daire.startswith(self.mahkeme):
+            daire = f"{self.mahkeme} {daire}".strip()
+        ad = f"{daire} {self.esas_no} E. {self.karar_no} K.".strip()
         return f"{ad} ({self.parca_no}/{self.parca_adet})" if self.parca_adet > 1 else ad
 
     def to_embed_text(self) -> str:
@@ -175,6 +186,7 @@ def parse(kayit: dict, boyut: int = PARCA_BOYU) -> list[Karar]:
         karar_tarihi=kayit.get("karar_tarihi", ""),
         durum=kayit.get("durum", ""),
         anahtar=kayit.get("anahtar", ""),
+        mahkeme=kayit.get("mahkeme", "Yargıtay"),
         tam_metin=tam,
     )
     return [Karar(**ortak, gerekce=p, parca_no=i, parca_adet=len(parcalar))
