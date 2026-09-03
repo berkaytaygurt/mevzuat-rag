@@ -60,3 +60,21 @@ def test_kisa_ad_danistay_diyor():
                        karar_no="2025/6100", karar_tarihi="18.12.2025")
     assert k.kisa_ad == "Danıştay 2. Daire 2020/1888 E. 2025/6100 K."
     assert k.chunk_id == "danistay-1"
+
+
+def test_api_captcha_mesaji_yakalaniyor():
+    """Captcha yalnizca sayfada degil, API cevabinda da bildiriliyor.
+
+    Cekim sirasinda sunucu metadata.FMTE icinde "DisplayCaptcha" dondu.
+    Ilk denetimimiz yalnizca sayfa bayragina bakiyordu, bu yuzden sonraki
+    anahtarlar sessizce "0 kayit" doneriyordu.
+    """
+    import pytest
+    with pytest.raises(CaptchaAcik):
+        DanistayClient._captcha_denetle(
+            '{"data":null,"metadata":{"FMTE":"Runtime exception:{0}:DisplayCaptcha"}}')
+
+
+def test_normal_hata_captcha_sayilmiyor():
+    DanistayClient._captcha_denetle(
+        '{"data":null,"metadata":{"FMTE":"Lütfen arama kriterlerini giriniz!"}}')

@@ -54,10 +54,17 @@ BELGE_UCU = f"{TABAN}/getDokuman"
 TARAYICI_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-# Sunucu captcha isteyip istemedigini sayfaya bu bayrakla yaziyor; sitenin
-# kendi isDisplayCaptcha() fonksiyonu da bunu okuyor.
+# Sunucu captcha isteyip istemedigini IKI ayri yerde bildiriyor:
+#   1. Sayfada bir bayrak (sitenin kendi isDisplayCaptcha() fonksiyonu bunu okur)
+#   2. API cevabinda metadata.FMTE icinde "DisplayCaptcha" -- olculdu, cekim
+#      sirasinda tam olarak boyle geldi ve bizim ilk denetimimiz bunu
+#      kacirdigi icin sonraki anahtarlar sessizce bos dondu.
+# (?<!is): sayfadaki "isDisplayCaptcha" kimligi her zaman var ve degeri
+# false olabilir; onu captcha sanmamak icin yalnizca bagimsiz gecen
+# "DisplayCaptcha" yakalaniyor.
 CAPTCHA_BAYRAGI_RE = re.compile(
-    r"""id\s*=\s*["']isDisplayCaptcha["'][^>]*>\s*true""", re.IGNORECASE)
+    r"""id\s*=\s*["']isDisplayCaptcha["'][^>]*>\s*true|(?<!is)DisplayCaptcha""",
+    re.IGNORECASE)
 
 
 class CaptchaAcik(RuntimeError):
@@ -168,7 +175,17 @@ class DanistayClient:
             istek = {"data": {**govde, "pageSize": sayfa_boyu, "pageNumber": sayfa}}
             try:
                 cevap = self.session.post(ARAMA_UCU, json=istek, timeout=60)
-                veri = (cevap.json() or {}).get("data")
+                self._captcha_denetle(cevap.text)
+                govde_cevap = cevap.json() or {}
+                veri = govde_cevap.get("data")
+                if veri is None:
+                    # Hatayi GORUNUR yap: onceki surumde bu dal sessizdi ve
+                    # anahtarlar sirayla "0 kayit" doneriyordu, sebebi
+                    # gorunmuyordu.
+                    mesaj = (govde_cevap.get("metadata") or {}).get("FMTE", "")
+                    log.warning("liste bos (%s s.%d): %s", kelime, sayfa, mesaj[:90])
+            except CaptchaAcik:
+                raise
             except (requests.RequestException, ValueError) as exc:
                 log.warning("liste hatasi (%s s.%d): %s", kelime, sayfa, exc)
                 break
