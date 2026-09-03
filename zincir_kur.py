@@ -36,7 +36,16 @@ def main() -> None:
         k = dict(kunye.get(kid, {}))
         k["id"], k["metin"] = kid, c.get("metin", "")
         kararlar.append(k)
-    log.info("%d karar, %d kunye", len(kararlar), len(kunye))
+    log.info("%d Yargitay karari, %d kunye", len(kararlar), len(kunye))
+
+    # Danistay kararlari da zincire giriyor: 657, 2577 gibi kanunlari
+    # yorumluyorlar ve idari yargi tarafi baska turlu bos kaliyor.
+    # Kunye ve metin ayni dosyada duruyor, onbellege gitmeye gerek yok.
+    dj = config.RAW_DIR / "danistay_kararlar.json"
+    if dj.exists():
+        danistay = json.loads(dj.read_text(encoding="utf-8"))
+        kararlar += danistay
+        log.info("%d Danistay karari eklendi", len(danistay))
 
     kayitlar = json.loads(
         (config.INDEX_DIR / "kayitlar.json").read_text(encoding="utf-8"))
