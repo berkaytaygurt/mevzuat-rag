@@ -10,6 +10,82 @@ nasıl çalışıyor, sitede ne var.
 
 ---
 
+## 0. Bu nedir, ne değildir
+
+### Nedir
+
+Aibars bir **arama** aracıdır. Türkiye'nin yürürlükteki mevzuatının
+tamamı ve Yargıtay kararları üzerinde çalışır. Avukat kendi diliyle
+soru yazar — hukuki terim bilmesi gerekmez — sistem ilgili maddeleri
+bulur, kısa bir cevap yazar ve **her cümlenin dayanağını gösterir**.
+
+Cevaptaki her madde numarası ve her sayı, gerçek madde metniyle
+karşılaştırılır. Tutmuyorsa cevap gösterilmez.
+
+### Ne değildir
+
+- **Hukuki görüş vermez.** "Davayı kazanırsın", "şu argümanı kullan",
+  "süren doldu" demez.
+- **Ezberden konuşmaz.** Yapay zekâ modelinin hafızasındaki hukuk
+  bilgisi kullanılmaz; cevap yalnızca sistemin bulduğu gerçek madde
+  metinlerinden üretilir.
+- **Sohbet botu değildir.** Konuşma geçmişi üzerinden akıl yürütmez;
+  her soru kendi başına aranır.
+- **Karar mercii değildir.** Getirdiği maddeler bir liste, bir
+  başlangıç noktasıdır. Çıkarım avukatın.
+
+### Yapay zekâ tam olarak nerede
+
+Sistemin üç yerinde yapay zekâ var, üçü de **yardımcı** roldedir:
+
+| Nerede | Ne yapıyor | Neden gerekli |
+|---|---|---|
+| Soruyu çevirme | Soruyu kanun diline / hukuki terime çevirir | Avukat "kiracımı çıkarabilir miyim" der, kanun "kira sözleşmesinin feshi" yazar |
+| Anlam eşleştirme | Soru ile madde metnini anlamca karşılaştırır | Kelime araması "muris muvazaası"nı bilmeyen kullanıcıya bir şey bulamaz |
+| Cevap yazma | Bulunan maddelerden kısa bir özet yazar | Avukat 10 maddeyi baştan okumak zorunda kalmasın |
+
+**Nerede YOK:** Kanun metinlerinde. Gösterilen her madde
+mevzuat.gov.tr'den gelen **birebir resmî metindir**; model onu
+yeniden yazmaz, özetlemez, düzeltmez. Kararlar da Yargıtay'ın kendi
+metnidir.
+
+Bu ayrım sistemin bel kemiğidir: model yalnızca *bulmaya* ve
+*özetlemeye* yarar, *hüküm üretmeye* değil.
+
+### Canlı olan kısım tam olarak nerede
+
+| Parça | Nerede duruyor |
+|---|---|
+| Kanun, yönetmelik, tebliğ (275.192 madde) | **Diskte** — bir kez indirildi |
+| Madde-madde atıf grafiği (105.937 bağlantı) | **Diskte** — metinden türetildi |
+| Yargıtay kararları | **Kısmen diskte** (7.566), gerisi **canlı internetten** |
+| Danıştay kararları | Neredeyse yok (40) — CAPTCHA engeli |
+
+Yani: **mevzuat sabittir, içtihat canlıdır.** Sebebi basit — kanun
+sayısı bellidir (14.439 mevzuat), indirilebilir; Yargıtay'da
+milyonlarca karar vardır, indirmekle bitmez.
+
+Canlı çekim **her soruda çalışmaz**. Önce yerel arşive bakılır; orada
+karşılık yoksa ya da kullanıcı "Daha fazla karar getir" derse
+Yargıtay'ın sitesine gidilir.
+
+### Ne kullanıldı
+
+| Ne için | Ne kullanıldı | Nerede çalışıyor |
+|---|---|---|
+| Soruyu anlamca maddelerle eşleştirmek | Qwen3-Embedding-0.6B | Kendi bilgisayarında |
+| Adayları eleyip sıralamak | bge-reranker-v2-m3 | Kendi bilgisayarında |
+| Birebir kelime araması | BM25 (klasik yöntem, yapay zekâ değil) | Kendi bilgisayarında |
+| Cevap yazmak, soruyu çevirmek | Google Gemini Flash Lite | Google'ın sunucusunda |
+| Site altyapısı | FastAPI + tek dosya HTML | Kendi bilgisayarında |
+| Veri kaynakları | mevzuat.gov.tr, karararama.yargitay.gov.tr | — |
+
+Arama yapan iki model **senin bilgisayarında** çalışır; dışarı
+yalnızca cevabı yazdırmak için Google'a gidilir. Mevzuat külliyatı ve
+avukatın dosyaları hiçbir zaman dışarı çıkmaz.
+
+---
+
 ## 1. Bir soru sorulduğunda ne oluyor
 
 ```
@@ -17,22 +93,20 @@ nasıl çalışıyor, sitede ne var.
                   |
                   v
     +------------------------------+
-    | 1. Soru kanun diline çevrilir|   HyDE - soruyu cevaplayacak
-    |                              |   varsayımsal bir hüküm yazılır,
-    |                              |   arama onunla yapılır
+    | 1. Soru kanun diline çevrilir|   ayrıntı aşağıda
     +------------------------------+
                   |
                   v
     +------------------------------+
-    | 2. Dört ayrı sinyalle aranır |   - madde numarası ("TBK 344")
-    |    ve sonuçlar birleştirilir |   - anlam (vektör)
-    |                              |   - kelime (BM25)
-    |                              |   - ham sorunun kendisi
+    | 2. Dört ayrı yoldan aranır   |   - madde numarası ("TBK 344")
+    |    ve sonuçlar birleştirilir |   - anlam
+    |                              |   - kelime
+    |                              |   - sorunun kendi hâli
     +------------------------------+
                   |
                   v
     +------------------------------+
-    | 3. En iyi 50 aday yeniden    |   cross-encoder her adayı
+    | 3. En iyi 50 aday yeniden    |   ikinci bir model her adayı
     |    sıralanır                 |   soruyla tek tek karşılaştırır
     +------------------------------+
                   |
@@ -43,6 +117,58 @@ nasıl çalışıyor, sitede ne var.
 ```
 
 Ortalama süre **6-19 saniye**.
+
+### İkinci adım: dört ayrı yoldan aramak
+
+Tek bir arama yöntemi her soruda çalışmaz, o yüzden dördü birden
+kullanılıp sonuçları birleştiriliyor:
+
+| Yol | Ne yapar | Ne zaman kurtarır |
+|---|---|---|
+| **Madde numarası** | "TBK 344" gibi doğrudan adresi yakalar | Avukat maddeyi zaten biliyorsa |
+| **Anlam** | Soruyla maddeyi *anlamca* eşleştirir | Kullanıcı hukuki terimi bilmiyorsa |
+| **Kelime** | Birebir kelime eşleşmesi arar | Özel bir terim geçiyorsa ("ecrimisil") |
+| **Sorunun kendi hâli** | Ham soruyu da ayrıca arar | Çeviri sırasında konu düşerse |
+
+Dördü de kendi listesini verir; bir madde birden çok listede üst
+sıralardaysa yukarı çıkar.
+
+### Üçüncü adım: eleme
+
+İlk üç adımdan ~50 aday çıkar. Bunları ikinci bir yapay zekâ modeli
+tek tek okur ve "bu madde bu soruya gerçekten cevap veriyor mu" diye
+puanlar. En iyi 10'u gösterilir.
+
+Neden ayrı bir adım: ilk arama hızlıdır ama kabadır — konuyla
+yüzeysel örtüşen maddeleri de getirir. İkinci model yavaştır ama
+isabetlidir; bu yüzden 275 bin maddeye değil, yalnızca ilk aramanın
+getirdiği 50 adaya uygulanır.
+
+### Birinci adım neden var
+
+Avukat ile kanun aynı kelimeleri kullanmaz:
+
+```
+avukat yazar : "işten çıkarıldım tazminat alabilir miyim"
+kanun yazar  : "işveren, iş sözleşmesini feshederken ..."
+```
+
+Soruyu olduğu gibi aratmak, iki farklı dil arasında benzerlik aramak
+demek. Bu yüzden sistem önce modele **"bu sorunun cevabını içerecek
+kanun maddesi nasıl yazılırdı"** diye sorar. Model kısa, uydurma bir
+hüküm cümlesi yazar; arama o cümleyle yapılır.
+
+Uydurulan cümle **kullanıcıya asla gösterilmez** — yalnızca arama
+sorgusudur. Cevap yine gerçek madde metinlerinden üretilir.
+
+Ölçüldü (34 soruluk set):
+
+| Yöntem | Doğru madde 1. sırada |
+|---|---|
+| Soruyu doğrudan aratmak | 23/34 |
+| Önce kanun diline çevirmek | 32/34 |
+
+Kısaca: **soruyu, cevabın yazıldığı dile çevirip öyle arıyoruz.**
 
 ---
 
@@ -63,7 +189,7 @@ Ortalama süre **6-19 saniye**.
 | Tüzük | 63 |
 | **Katalog toplamı** | **14.439** |
 
-Bunlardan **275.192 madde** çıkarıldı ve vektörlendi. Kanunların
+Bunlardan **275.192 madde** çıkarıldı ve aranabilir hale getirildi. Kanunların
 %99,3'ü tam — eksik 6 tanesi 1920'lerden kalma nizamnameler.
 Yönetmelik ve tüzükler %100.
 
@@ -177,7 +303,8 @@ karar daha çeker.
 | marka hükümsüzlüğü davasını kim açabilir | 0,10 | **0,95** |
 | patent hakkına tecavüzde ne talep edilebilir | 0,01 | **0,95** |
 
-*(ham cross-encoder alaka puanı)*
+*(eleme modelinin verdiği alaka puanı — 1'e yakın olması
+"bu karar bu soruya cevap veriyor" demek)*
 
 İndirilmiş alanlarda (iş, kira) yerel arşiv daha iyi; hiç
 indirilmemiş alanlarda (marka, patent) yerel fiilen sıfır. Biri
@@ -194,7 +321,7 @@ yüzden soru önce hukuki terime çevrilir:
       "muris muvazaası"
             |  Yargıtay'da aranır
             v
-   gelen kararlar bizim reranker'ımızla sıralanır
+   gelen kararlar bizim eleme modelimizle sıralanır
 ```
 
 Bu adım atlanırsa Yargıtay kelimeleri OR'layıp alakasız karar getirir.
@@ -207,18 +334,19 @@ kararları geliyordu — konu komşu ama dava başka.
 
 | İş | Model | Nerede çalışıyor |
 |---|---|---|
-| Gömme (anlam) | Qwen3-Embedding-0.6B | Yerel GPU (RTX 3050, 4 GB) |
-| Yeniden sıralama | BAAI/bge-reranker-v2-m3 | Yerel GPU |
-| Cevap üretimi | Gemini Flash Lite | Google API |
-| Terim / HyDE üretimi | Gemini Flash Lite | Google API |
+| Anlam eşleştirme | Qwen3-Embedding-0.6B | Ekran kartında (RTX 3050, 4 GB) |
+| Aday eleme | bge-reranker-v2-m3 | Ekran kartında |
+| Cevap yazma | Gemini Flash Lite | Google |
+| Soruyu çevirme | Gemini Flash Lite | Google |
 
-**Maliyet:** soru başına 4 Gemini çağrısı, ~6.000 token, **0,10 TL**.
+**Maliyet:** soru başına Google'a 4 istek gidiyor, **0,10 TL** tutuyor.
 Günde 20 soru soran bir avukat için ayda ~45 lira.
 
 Kod tarafında **günlük 1 dolarlık sert tavan** var; aşılırsa istek
 reddedilir. Tavan istek sayısına değil **paraya** bakar — bir çağrının
-maliyeti 100 kat değişiyor (terim çıkarma ~200 token, cevap üretme
-~20.000 token), bu yüzden istek saymak parayı sınırlamıyor.
+maliyeti 100 kat değişiyor (kısa bir terim üretmek ile 10 maddelik
+bir cevap yazmak arasında bu kadar fark var), bu yüzden istek saymak
+parayı sınırlamıyor.
 
 ---
 
@@ -229,12 +357,13 @@ maliyeti 100 kat değişiyor (terim çıkarma ~200 token, cevap üretme
   aşılmıyor.
 - **İstinaf (Bölge Adliye Mahkemesi) kararları yok.**
 - **Bazı sorularda ilgisiz karar geliyor.** Yerel arşiv soruyla
-  yüzeysel örtüşen kararı seçebiliyor; cross-encoder puanları
-  doyduğunda (0,999) ayırt edemiyor.
-- **HyDE bazen konuyu düşürüyor.** Aynı başlıklı çok madde olan
-  yerlerde doğru madde kaybolabiliyor. Üç çözüm denendi, ikisi
-  ölçümde geriletti; üçüncüsü (ham soruyu ayrı sinyal olarak eklemek)
-  alındı ve kapsama 33/34'ten 34/34'e çıktı.
+  yüzeysel örtüşen kararı seçebiliyor; eleme modeli birden çok karara
+  tam puan verdiğinde aralarında ayrım yapamıyor.
+- **Soruyu kanun diline çevirirken konu düşebiliyor.** "Uyuşturucu
+  ticaretinde etkin pişmanlık" sorusunda üretilen cümlede
+  "uyuşturucu" geçmedi; TCK'da "Etkin pişmanlık" başlıklı 11 madde
+  olduğu için doğrusu kayboldu. Ham soruyu da ayrıca aratmak bunu
+  düzeltti (kapsama 33/34'ten 34/34'e çıktı).
 - **Vurgulama bazen fazla geniş.** Uzun maddede neredeyse tüm metni
   işaretleyebiliyor; o zaman işaretlemenin anlamı kalmıyor.
 - **Kayıtlı cevaplarda karar metinleri kırpık** (4.000 karakter) ve
@@ -245,23 +374,29 @@ maliyeti 100 kat değişiyor (terim çıkarma ~200 token, cevap üretme
 
 ## 7. Çalıştırma
 
+**Gereken dört adım:**
+
 ```bash
-python cli.py katalog          # mevzuat listesini çek
-python cli.py cek              # metinleri indir, maddelere ayır
-python cli.py indeksle         # GPU'da vektörle, BM25 kur
-python cli.py atif-grafi       # madde-madde atıfları çıkar
-python cli.py ictihat          # Yargıtay kararı indir (isteğe bağlı)
-python cli.py karar-indeksle   # kararları ayrı indekse yaz
+python cli.py katalog     # mevzuat listesini çek
+python cli.py cek         # metinleri indir, maddelere ayır
+python cli.py indeksle    # aranabilir hale getir
+python server.py          # siteyi aç
+```
+
+Bu kadarı yeterli. Kararlar zaten Yargıtay'dan canlı geliyor.
+
+**İsteğe bağlı — sistemi zenginleştirir:**
+
+```bash
+python cli.py atif-grafi       # "bu madde şunun istisnası" bağlantıları
+python cli.py ictihat          # kararları diske indir (hız için)
+python cli.py karar-indeksle   # indirilen kararları aranabilir yap
 python zincir_kur.py           # hangi karar hangi maddeyi yorumlamış
-python server.py               # siteyi aç
+python cli.py canli-devral     # canlı gelenleri kalıcı arşive kat
 ```
 
-Canlı gelen kararları kalıcı arşive katmak için:
-
-```bash
-python cli.py canli-devral
-python cli.py karar-indeksle
-```
+Kararları indirmek **zorunlu değil**; yalnızca sık sorulan konularda
+cevabı hızlandırır.
 
 **260 test** koda eşlik ediyor:
 
@@ -272,5 +407,4 @@ python -m pytest tests/ -q
 ---
 
 *Aibars genel bilgi verir, hukuki görüş yerine geçmez. Cevaplar
-yalnızca indekslenmiş mevzuat metinlerine ve Yargıtay kararlarına
-dayanır. Karar dayanağı yapmadan önce bir avukata danışın.*
+yalnızca resmî mevzuat metinlerine ve Yargıtay kararlarına dayanır. Karar dayanağı yapmadan önce bir avukata danışın.*
