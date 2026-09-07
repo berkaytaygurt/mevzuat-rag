@@ -313,6 +313,12 @@
     font-size: 12px; padding: 3px 9px; border-radius: 999px;
     border: 1px solid var(--kenar); color: var(--metin-orta);
   }
+  /* Basligi olmayan maddede metnin basi gosteriliyor; gercek bir baslik
+     gibi gorunmesin diye soluk ve italik. */
+  .madde-onizleme {
+    font-family: var(--sans); font-size: 14px; font-style: italic;
+    color: var(--metin-sol); font-weight: 400;
+  }
   .fikra { margin: 0 0 11px; }
   .fikra:last-child { margin-bottom: 0; }
   .madde-dip {
@@ -681,6 +687,22 @@ function dogrulamaKutusu(d) {
 // ayirici bu maddeleri tek blok duvar halinde birakiyordu.
 const BOLUM_BASI = /(?=\(\d{1,2}\)\s)|(?=(?:^|\s)(?:I|II|III|IV|V|VI|VII|VIII|IX|X)-\s)/;
 
+// Baslik yoksa metnin basini goster. Olculdu: maddelerin %7,4'u
+// (20.253 madde, 9.036'si kanunlarda) gercekten baslik tasimiyor --
+// degisiklik kanunlari, yururluk/yurutme maddeleri, gecici maddeler.
+// PDF'te de baslik satiri yok, yani ayristirici hatasi degil.
+//
+// "(basliksiz madde)" yazmak avukata hicbir sey soylemiyor; metnin ilk
+// satiri ise ne oldugunu bir bakista anlatiyor ("Bu Kanun hukumlerini
+// Cumhurbaskani yurutur").
+function maddeEtiketi(m) {
+  if (m.baslik) return kacis(m.baslik);
+  const t = (m.metin || "").trim();
+  if (!t) return '<span class="madde-onizleme">(metin yok)</span>';
+  const kisa = t.length > 76 ? t.slice(0, 76).replace(/\s+\S*$/, "") + "…" : t;
+  return '<span class="madde-onizleme">' + kacis(kisa) + "</span>";
+}
+
 function fikralara(metin) {
   const t = (metin || "").trim();
   if (!t) return "";
@@ -911,7 +933,7 @@ function dayanakPaneli(d) {
           '<span class="ok">▶</span>' +
           '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
           '<span class="madde-baslik">' +
-            kacis(m.baslik || "(başlıksız madde)") + "</span>" +
+            maddeEtiketi(m) + "</span>" +
           rozet +
         "</div>" +
         '<div class="madde-govde">' + maddeMetni(m) +

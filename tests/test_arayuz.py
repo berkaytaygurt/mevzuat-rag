@@ -120,3 +120,17 @@ def test_madde_metni_fikralara_bolunuyor():
     assert "function fikralara" in js
     # Ucu de fikra bolmeyi kullanmali: dayanak, karsi taraf, kararlar
     assert js.count("fikralara(") >= 4, "fikra bolme her yerde kullanilmamis"
+
+
+def test_basliksiz_maddede_metin_onizlemesi():
+    """Baslik yoksa "(basliksiz madde)" degil, metnin basi gosterilmeli.
+
+    Olculdu: maddelerin %7,4'u (20.253) gercekten baslik tasimiyor --
+    degisiklik kanunlari, yururluk/yurutme maddeleri, gecici maddeler.
+    PDF'te de baslik satiri yok, yani ayristirici hatasi degil. Ama
+    "(basliksiz madde)" etiketi avukata hicbir sey soylemiyor.
+    """
+    js = _script()
+    assert "function maddeEtiketi" in js
+    assert "(başlıksız madde)" not in js, "eski yer tutucu duruyor"
+    assert "madde-onizleme" in js
