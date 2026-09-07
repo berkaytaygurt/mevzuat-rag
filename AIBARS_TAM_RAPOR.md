@@ -238,6 +238,47 @@ madde metniyle karşılaştırılır. Eşleşmezse cevap gösterilmez.
 Sistem külliyatta karşılık bulamazsa **uydurmaz**, "dayanak bulamadım"
 der.
 
+### Olayı anlatırsanız: "Sorunuzu netleştirelim"
+
+Avukat somut bir dosyayla gelir ve soruyu **olguyla** yazar. Ölçüldü —
+aynı mesele dört ayrı biçimde sorulduğunda, beş hukuk alanında:
+
+| Nasıl yazıldı | Doğru madde 1. sırada |
+|---|---|
+| Olay anlatımı (uzun, olgulu) | 1/5 |
+| Doğal soru cümlesi | 4/5 |
+| Hukuki kavram (kısa) | 5/5 |
+
+Yani sistem, avukatın **en doğal yazma biçiminde** en zayıf. Ama
+avukattan "kavram gibi yaz" diye beklemek de doğru değil; o ne
+istediğini bilir, nasıl ifade edeceğini bilmez.
+
+Bu yüzden sistem **tahmin etmiyor, soruyor.** Olay anlatımı algılanınca
+mesele başlıklarına çevriliyor ve kullanıcı hangisini sorduğunu
+seçiyor:
+
+```
+yazdığınız:
+  "Belediye arazimi imar planı değişikliği yaparak yeşil alana
+   çevirdi (kamulaştırdı), bu idari işlemin iptali ve yürütmeyi
+   durdurma alabilir miyim?"
+
+Sorunuzu netleştirelim
+  - imar planı değişikliğiyle taşınmazın yeşil alana alınması
+    suretiyle mülkiyet hakkına müdahale edilmesi
+  - idari işlemin uygulanması halinde telafisi güç zararlar
+    doğacağı gerekçesiyle yürütmenin durdurulması kararı verilmesi
+  - imar planı değişikliği işleminin iptali davası açılması ve
+    hukuka aykırılık denetimi
+  - Hiçbiri — olayı olduğu gibi ara
+```
+
+Seçtiğiniz başlıkla aranıyor. Başlıklar külliyata yakınlığına göre
+sıralanıyor: karşılığı olmayan başlık üste çıkmıyor.
+
+**"Hiçbiri" her zaman duruyor** — sistem yanlış anlamışsa avukat onu
+aşabilmeli.
+
 ### Dört sekme
 
 | Sekme | Ne var |
