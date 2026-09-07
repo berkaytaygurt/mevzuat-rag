@@ -618,10 +618,10 @@
 <div class="uygulama">
 <aside class="kenar">
   <div class="kenar-bas">
-    <h2 title="Çift tıklayarak adını değiştirin">Dosyalar</h2>
+    <h2 title="Çift tıklayarak adını değiştirin">Sohbetler</h2>
     <span style="display:flex;gap:6px">
-      <button class="kenar-ekle" id="dosyaAc" title="Kaydedilmiş dosyayı aç">Aç</button>
-      <button class="kenar-ekle" id="dosyaEkle">+ Yeni</button>
+      <button class="kenar-ekle" id="dosyaAc" title="Kaydedilmiş sohbeti aç">Aç</button>
+      <button class="kenar-ekle" id="dosyaEkle">+ Yeni sohbet</button>
     </span>
   </div>
   <input type="file" id="dosyaGirdi" accept=".json,application/json" hidden>
@@ -958,7 +958,7 @@ const Depo = {
       // Kota dolabilir ya da tarayici depolamayi engelleyebilir
       // (gizli sekme, site verisi kapali). Sessizce gecmiyoruz:
       // kullanici kaydettigini saniyorsa daha kotu.
-      alert("Dosya kaydedilemedi — tarayıcı depolaması dolu veya kapalı.");
+      alert("Sohbet kaydedilemedi — tarayıcı depolaması dolu veya kapalı.");
       return false;
     }
   },
@@ -975,7 +975,7 @@ function dosyaKaydet() { Depo.yaz(dosyalar); dosyalariCiz(); }
 function dosyaYeni(ad) {
   const d = {
     id: "d" + Date.now().toString(36),
-    ad: ad || "Yeni dosya",
+    ad: ad || "Yeni sohbet",
     sorular: [],       // yalnizca metin
     maddeler: [],      // isaretlenenler
     kararlar: [],
@@ -990,7 +990,7 @@ function dosyaSil(id) {
   const d = dosyalar.dosyalar.find(function (x) { return x.id === id; });
   if (!d) return;
   const sayi = d.maddeler.length + d.kararlar.length;
-  if (sayi && !confirm('"' + d.ad + '" dosyası ve içindeki ' + sayi +
+  if (sayi && !confirm('"' + d.ad + '" sohbeti ve içindeki ' + sayi +
                        " kayıt silinecek. Emin misiniz?")) return;
   dosyalar.dosyalar = dosyalar.dosyalar.filter(function (x) { return x.id !== id; });
   if (dosyalar.acik === id) dosyalar.acik = null;
@@ -1000,7 +1000,7 @@ function dosyaSil(id) {
 function dosyaAdiUret(soru) {
   // ChatGPT gibi: ilk sorudan bir ad turet. Avukat sonra degistirebilir.
   const t = (soru || "").replace(/\s+/g, " ").trim();
-  if (!t) return "Adsız dosya";
+  if (!t) return "Yeni sohbet";
   return t.length > 42 ? t.slice(0, 42).replace(/\s+\S*$/, "") + "…" : t;
 }
 
@@ -1083,7 +1083,7 @@ function dosyalariCiz() {
   if (!kap) return;
   if (!dosyalar.dosyalar.length) {
     kap.innerHTML = '<div class="gecmis-soru" style="cursor:default">' +
-      "Henüz dosya yok.</div>";
+      "Henüz sohbet yok.</div>";
     return;
   }
   let h = "";
@@ -1095,7 +1095,7 @@ function dosyalariCiz() {
            '<span class="dosya-ad">' + kacis(d.ad) + "</span>" +
            (sayi ? '<span class="dosya-sayi">' + sayi + "</span>" : "") +
            '<button class="dosya-sil" data-sil="' + kacis(d.id) +
-             '" title="Dosyayı sil">×</button>' +
+             '" title="Sohbeti sil">×</button>' +
          "</div>";
     if (secili && d.sorular.length) {
       h += '<div class="kenar-gecmis">';
@@ -1126,13 +1126,13 @@ function isaretDugmesi(tur, kimlik) {
   const ekli = dosyadaMi(tur, kimlik);
   return '<button class="isaret' + (ekli ? " ekli" : "") +
     '" data-isaret="' + kacis(tur) + '" data-kimlik="' + kacis(kimlik) +
-    '" title="' + (ekli ? "Dosyadan çıkar" : "Dosyaya ekle") + '">' +
+    '" title="' + (ekli ? "Kayıtlardan çıkar" : "Kaydet") + '">' +
     (ekli ? "★" : "☆") + "</button>";
 }
 
 function isaretDegistir(tur, kimlik) {
   let d = acikDosya();
-  if (!d) d = dosyaYeni("Adsız dosya");
+  if (!d) d = dosyaYeni("Yeni sohbet");
   const liste = tur === "madde" ? d.maddeler : d.kararlar;
   const yer = liste.findIndex(function (x) { return x.kimlik === kimlik; });
   if (yer >= 0) {
@@ -1414,7 +1414,7 @@ function ciz(d) {
   }
   const dosya = acikDosya();
   if (dosya) {
-    paneller.push({ ad: "Dosyam",
+    paneller.push({ ad: "Kaydettiklerim",
                     sayi: dosya.maddeler.length + dosya.kararlar.length,
                     icerik: dosyaPaneli(dosya) });
   }
@@ -1540,7 +1540,7 @@ function dosyaDisaAktar(d) {
   const url = URL.createObjectURL(new Blob([veri], { type: "application/json" }));
   bag.href = url;
   // Dosya adindaki isaretler dosya sistemini bozabilir.
-  bag.download = (d.ad || "dosya").replace(/[^\p{L}\p{N} _-]/gu, "").trim() + ".aibars.json";
+  bag.download = (d.ad || "sohbet").replace(/[^\p{L}\p{N} _-]/gu, "").trim() + ".aibars.json";
   document.body.appendChild(bag);
   bag.click();
   bag.remove();
@@ -1554,12 +1554,12 @@ function dosyaIceriAktar(dosyaNesnesi) {
     try {
       gelen = JSON.parse(okuyucu.result);
     } catch (e) {
-      alert("Dosya okunamadı: geçerli bir Aibars dosyası değil.");
+      alert("Okunamadı: geçerli bir Aibars sohbet dosyası değil.");
       return;
     }
     const d = gelen && gelen.dosya;
     if (!d || !Array.isArray(d.maddeler) || !Array.isArray(d.kararlar)) {
-      alert("Dosya okunamadı: beklenen alanlar yok.");
+      alert("Okunamadı: beklenen alanlar yok.");
       return;
     }
     // Yeni kimlik: ayni dosyayi iki kez acmak birbirini ezmesin.
@@ -1577,7 +1577,7 @@ function dosyaMetniKopyala(d) {
   // Dilekceye yapistirmak icin duz metin. JSON degil: avukat bunu
   // Word'e alacak.
   const p = [];
-  p.push(d.ad || "Dosya");
+  p.push(d.ad || "Sohbet");
   p.push("=".repeat((d.ad || "Dosya").length));
   if (d.not_) p.push("\n" + d.not_);
   if (d.sorular.length) {
@@ -1637,7 +1637,7 @@ function dosyaPaneli(d) {
     "bilgisayarda açtığınızda gelmez.</div>";
 
   h += '<textarea class="dosya-not" id="dosyaNot" rows="3" ' +
-       'placeholder="Bu dosya için notlarınız…">' + kacis(d.not_ || "") +
+       'placeholder="Bu sohbet için notlarınız…">' + kacis(d.not_ || "") +
        "</textarea>";
 
   if (!d.maddeler.length && !d.kararlar.length) {
@@ -1676,7 +1676,7 @@ function dosyaPaneli(d) {
   }
 
   h += '<div class="dosya-eylem">' +
-    '<button class="disa-aktar" id="disaAktar">Bilgisayara kaydet</button>' +
+    '<button class="disa-aktar" id="disaAktar">Bilgisayara indir</button>' +
     '<button class="disa-aktar" id="metinKopyala">Metin olarak kopyala</button>' +
     "</div>";
   return h;
@@ -1773,9 +1773,22 @@ function kararPaneli(kararlar, kaynak) {
 /* Olay yetkilendirme: kenar cubugu ve isaret dugmeleri her cizimde
    yeniden uretiliyor, tek tek dinleyici baglamak sizinti demek. */
 document.getElementById("dosyaEkle").onclick = function () {
-  const ad = prompt("Dosya adı — örn. Kiracı tahliye, Ahmet Y.");
-  if (ad === null) return;
-  dosyaYeni(ad.trim() || "Adsız dosya");
+  // ChatGPT/Gemini davranisi: "yeni sohbet" ONCEDEN bos bir kayit
+  // olusturmuyor, yalnizca SECIMI BIRAKIYOR. Sohbet ilk soru
+  // sorulunca dogar ve adini o sorudan alir.
+  //
+  // Onceki hal kullaniciya "dosya adi" soruyordu; iki sorun vardi:
+  // (1) adlandirma isini soru sorulmadan ONCE yapmak, kimsenin
+  //     yapmadigi bir adim, (2) uzerine bos kayitlar birikiyordu.
+  dosyalar.acik = null;
+  Depo.yaz(dosyalar);
+  dosyalariCiz();
+  cikti.innerHTML = "";
+  const ipucu = document.querySelector(".ipucu-satiri");
+  if (ipucu) ipucu.hidden = false;
+  soruEl.value = "";
+  soruEl.focus();
+  sonVeri = null;
 };
 
 document.getElementById("dosyaListe").addEventListener("dblclick", function (e) {
@@ -1785,7 +1798,7 @@ document.getElementById("dosyaListe").addEventListener("dblclick", function (e) 
   if (!el) return;
   const d = dosyalar.dosyalar.find(function (x) { return x.id === el.dataset.dosya; });
   if (!d) return;
-  const ad = prompt("Dosya adı", d.ad);
+  const ad = prompt("Sohbet adı", d.ad);
   if (ad === null) return;
   d.ad = ad.trim() || d.ad;
   dosyaKaydet();
