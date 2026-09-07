@@ -257,8 +257,22 @@ def graf_baglantilari(m: dict, kaynak: dict) -> dict:
                 "mevzuat_adi": ad, "baslik": baslik,
                 "kulliyatta": anahtar in adlar}
 
+    # AYNI HEDEF BIR KEZ. Metinde ayni maddeye birden fazla atif olabiliyor
+    # ve her biri ayri iliski turu aliyor; ekranda "m.17 gonderme yapiyor"
+    # ve "m.17 atif yapiyor" alt alta gorununce avukat icin gurultu oluyor.
+    # Daha BELIRLEYICI iliski kazaniyor: "istisnasidir" bilgisi
+    # "atif yapiyor"dan cok daha degerli.
+    oncelik = {"mulga": 0, "degistirir": 1, "istisna": 2, "yaptirim": 3,
+               "gonderme": 4, "atif": 5}
+    en_iyi: dict[str, dict] = {}
+    for e in g.atiflar(no, madde_no):
+        h = e["hedef"]
+        onceki = en_iyi.get(h)
+        if onceki is None or oncelik.get(e["iliski"], 9) < onceki["_p"]:
+            en_iyi[h] = {**e, "_p": oncelik.get(e["iliski"], 9)}
+
     yapilan = []
-    for e in g.atiflar(no, madde_no)[:12]:
+    for e in list(en_iyi.values())[:12]:
         d = coz(e["hedef"])
         d["iliski"] = ILISKI_ADI.get(e["iliski"], e["iliski"])
         d["kanit"] = e.get("kanit", "")

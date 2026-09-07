@@ -675,10 +675,16 @@ function dogrulamaKutusu(d) {
 // bulamiyor. Yedi fikrali bir madde ekranda okunamaz bir duvar oluyordu.
 // Yalnizca fikra duzeyinde ("(1)") boluyoruz; bent duzeyinde ("a)")
 // bolmek metni gereksiz parcaliyor.
+// Fikra/bolum sinirlari. "(1)" bicimi yeni kanunlarda; eski kanunlar
+// (or. 2003 tarihli Is Kanunu m.25) "I- Saglik sebepleri:" gibi ROMEN
+// rakamli bolum basliklari kullaniyor ve yalnizca "(1)" arayan bir
+// ayirici bu maddeleri tek blok duvar halinde birakiyordu.
+const BOLUM_BASI = /(?=\(\d{1,2}\)\s)|(?=(?:^|\s)(?:I|II|III|IV|V|VI|VII|VIII|IX|X)-\s)/;
+
 function fikralara(metin) {
   const t = (metin || "").trim();
   if (!t) return "";
-  const parcalar = t.split(/(?=\(\d{1,2}\)\s)/).filter(function (p) {
+  const parcalar = t.split(BOLUM_BASI).filter(function (p) {
     return p.trim();
   });
   if (parcalar.length < 2) return '<p class="fikra">' + kacis(t) + "</p>";
@@ -695,7 +701,7 @@ function maddeMetni(m) {
   // varsayilan acilinca duvar metni geri geliyordu: parcalar cumle
   // gruplari, fikra siniri degil. Fikra basiyla baslayan parca yeni
   // paragraf aciyor.
-  const FIKRA_BASI = /^\(\d{1,2}\)\s/;
+  const FIKRA_BASI = /^\(\d{1,2}\)\s|^(?:I|II|III|IV|V|VI|VII|VIII|IX|X)-\s/;
   let vurguVar = false, govde = "", acik = false;
   p.forEach(function (x) {
     const t = (x.metin || "").trim();

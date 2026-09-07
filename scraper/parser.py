@@ -30,6 +30,13 @@ BOLUM_RE = re.compile(
     r"^\s*[A-ZÇĞİÖŞÜ\s]{3,}\s+(BÖLÜM|KISIM|AYIRIM|AYRIM|KİTAP)\s*$", re.IGNORECASE
 )
 DEGISIKLIK_RE = re.compile(r"\((?:Ek|Değişik|Degisik|Mülga|Mulga|İptal|Iptal)\s*:[^)]{0,200}\)")
+# Ust-simge dipnot isareti duz metne inince onceki kapanis parantezine
+# YAPISIYOR: "(Ek:16/4/2020-7244/9 md.)4041" -- sondaki 4041, 40 ve 41
+# numarali iki dipnot. Olculdu: 1.056 maddede (%0,4) var.
+# Bosluk sarti guvenlik: mesru bir sayi her zaman bosluktan sonra gelir,
+# dipnot isareti ise paranteze bitisik.
+YAPISIK_DIPNOT_RE = re.compile(
+    r"(\((?:Ek|Değişik|Degisik|Mülga|Mulga|İptal|Iptal|Yeniden düzenleme)[^)]{0,200}\))\d{1,8}")
 MULGA_RE = re.compile(r"\(\s*(?:Mülga|Mulga|İptal|Iptal)\s*:", re.IGNORECASE)
 # Maddenin TAMAMI mulga ise isaret metnin en basinda durur. Isaret govdenin
 # icinde geciyorsa yalnizca bir fikra kaldirilmistir ve madde yururluktedir
@@ -314,7 +321,8 @@ def maddeleri_cikar(bloklar: list[str], *, tur_adi: str = "Kanun",
     def flush() -> None:
         nonlocal current, govde
         if current is not None:
-            current.metin = " ".join(govde).strip()
+            current.metin = YAPISIK_DIPNOT_RE.sub(
+                r"", " ".join(govde).strip())
             current.degisiklikler = DEGISIKLIK_RE.findall(current.metin)
             current.mulga = bool(TAM_MULGA_RE.match(current.metin))
             current.kismi_mulga = (not current.mulga
@@ -372,7 +380,9 @@ def maddeleri_cikar(bloklar: list[str], *, tur_adi: str = "Kanun",
             harf = (m.group("harf") or "").upper()
             madde_no = f"{tip} {m.group('no')}".strip() + (f"/{harf}" if harf else "")
             # "1. Onemli sebepler2" -> sondaki dipnot rakamini at
-            baslik = re.sub(r"(?<=[A-ZÇĞİÖŞÜa-zçğıöşü])\d{1,3}$", "", baslik).strip()
+            # 1-3 hane yetmiyordu: bir madde birden fazla dipnot tasiyabiliyor ve
+            # isaretler bitisik yaziliyor ("Yaptirim hukumleri252627").
+            baslik = re.sub(r"(?<=[A-ZÇĞİÖŞÜa-zçğıöşü])\d{1,8}$", "", baslik).strip()
 
             current = Madde(mevzuat_no=no, mevzuat_adi=ad, mevzuat_tur=tur_adi,
                             tertip=tert, madde_no=madde_no, baslik=baslik,
