@@ -59,7 +59,7 @@ Bu ayrım sistemin bel kemiğidir: model yalnızca *bulmaya* ve
 | Kanun, yönetmelik, tebliğ (275.192 madde) | **Diskte** — bir kez indirildi |
 | Madde-madde atıf grafiği (105.937 bağlantı) | **Diskte** — metinden türetildi |
 | Yargıtay kararları | **Kısmen diskte** (7.566), gerisi **canlı internetten** |
-| Danıştay kararları | Neredeyse yok (40) — CAPTCHA engeli |
+| Danıştay kararları | Neredeyse tamamı **canlı internetten** |
 
 Yani: **mevzuat sabittir, içtihat canlıdır.** Sebebi basit — kanun
 sayısı bellidir (14.439 mevzuat), indirilebilir; Yargıtay'da
@@ -204,8 +204,9 @@ elimizdeyken mümkün.
 | Kaynak | Durum |
 |---|---|
 | Yargıtay (canlı) | `karararama.yargitay.gov.tr` — sınırsız |
+| Danıştay (canlı) | `karararama.danistay.gov.tr` — sınırsız |
 | Yargıtay (yerel arşiv) | 7.566 karar / 30.828 parça |
-| Danıştay | 40 karar — CAPTCHA nedeniyle durduruldu |
+| Danıştay (yerel arşiv) | 40 karar |
 
 **Neden indirilmedi:** Yargıtay'da milyonlarca karar var, indirmekle
 bitmez. Onun yerine soru sorulduğunda canlı aranıyor.
@@ -324,6 +325,32 @@ yüzden soru önce hukuki terime çevrilir:
    gelen kararlar bizim eleme modelimizle sıralanır
 ```
 
+### Hangi mahkemede aranacağı
+
+Türkiye'de yargı ikiye ayrılıyor ve iki arşiv **ayrı sitelerde**:
+
+```
+YARGITAY   kişiler arası uyuşmazlıklar + bütün ceza davaları
+           boşanma, miras, kira, iş, ticaret, tazminat, suç
+
+DANIŞTAY   kişi ile DEVLET arasındaki uyuşmazlıklar
+           memur, disiplin, atama, vergi, imar, kamulaştırma,
+           ruhsat, ihale, öğrenci işleri
+```
+
+Yanlış arşivde aramak boş sonuç demek: memur disiplin cezası
+Yargıtay'da yoktur. Bu yüzden soru terime çevrilirken **hangi
+mahkemede aranacağı da aynı istemde soruluyor** — ayrı bir çağrı
+değil, ek gecikme yok.
+
+```
+"memura verilen kademe ilerlemesinin durdurulması cezası"
+        → disiplin cezasının iptali | DANIŞTAY
+
+"kiracı iki kez ihtar aldı, tahliye edebilir miyim"
+        → iki haklı ihtar nedeniyle tahliye | YARGITAY
+```
+
 Bu adım atlanırsa Yargıtay kelimeleri OR'layıp alakasız karar getirir.
 Ölçüldü: doğal cümleyle arandığında "kadastro öncesi tapu iptali"
 kararları geliyordu — konu komşu ama dava başka.
@@ -352,9 +379,9 @@ parayı sınırlamıyor.
 
 ## 6. Bilinen sınırlar
 
-- **Danıştay boş.** İdari yargı (memur, vergi, imar) kapsanmıyor;
-  CAPTCHA çıktığı için çekim 40 kararda durduruldu. Bot denetimi
-  aşılmıyor.
+- **Danıştay kararları Yargıtay'a göre daha zayıf eşleşiyor.** Karar
+  metni uzun bir usul başlığıyla başlıyor ve içindeki isimler zaten
+  "..." ile anonimleştirilmiş; eleme modeli özü geç görüyor.
 - **İstinaf (Bölge Adliye Mahkemesi) kararları yok.**
 - **Bazı sorularda ilgisiz karar geliyor.** Yerel arşiv soruyla
   yüzeysel örtüşen kararı seçebiliyor; eleme modeli birden çok karara

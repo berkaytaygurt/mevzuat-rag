@@ -72,7 +72,43 @@ def test_api_captcha_mesaji_yakalaniyor():
     import pytest
     with pytest.raises(CaptchaAcik):
         DanistayClient._captcha_denetle(
-            '{"data":null,"metadata":{"FMTE":"Runtime exception:{0}:DisplayCaptcha"}}')
+            '{"data":null,"metadata":{"FMTE":"Runtime exception:{0}:DisplayCaptcha"}}',
+            api=True)
+
+
+def test_sayfanin_kendi_javascripti_captcha_sayilmiyor():
+    """EN PAHALI YANLIS ALARM. Danistay cekimi GUNLERCE bu yuzden durdu.
+
+    Acilis sayfasinin JavaScript kaynaginda sitenin captcha'yi DENETLEYEN
+    kodu var:
+
+        if(response.metadata.FMTE.indexOf("DisplayCaptcha") > -1){
+
+    Eski desen sayfada gecen "DisplayCaptcha" dizgisini captcha sanip
+    isi durduruyordu. Oysa ayni sayfadaki bayrak "false" idi -- captcha
+    hic acilmamisti. Danistay 40 kararda kaldi ve idari yargi (memur,
+    vergi, imar) tumden kapsam disi kaldi.
+
+    Ders: bir sayfanin KAYNAK KODUNDA gecen kelime, o durumun
+    gerceklestigi anlamina gelmiyor.
+    """
+    sayfa = """<html><body>
+      <span id="isDisplayCaptcha">false</span>
+      <script>
+        if(response.metadata.FMTE.indexOf("DisplayCaptcha") > -1){
+          isDisplayCaptcha = $('#isDisplayCaptcha').text();
+        }
+      </script>
+    </body></html>"""
+    DanistayClient._captcha_denetle(sayfa)          # patlamamali
+
+
+def test_sayfa_bayragi_true_ise_duruyor():
+    """Gercekten acikken durmali."""
+    import pytest
+    with pytest.raises(CaptchaAcik):
+        DanistayClient._captcha_denetle(
+            '<span id="isDisplayCaptcha">true</span>')
 
 
 def test_normal_hata_captcha_sayilmiyor():

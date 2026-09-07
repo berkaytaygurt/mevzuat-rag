@@ -54,17 +54,28 @@ BELGE_UCU = f"{TABAN}/getDokuman"
 TARAYICI_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
-# Sunucu captcha isteyip istemedigini IKI ayri yerde bildiriyor:
-#   1. Sayfada bir bayrak (sitenin kendi isDisplayCaptcha() fonksiyonu bunu okur)
-#   2. API cevabinda metadata.FMTE icinde "DisplayCaptcha" -- olculdu, cekim
-#      sirasinda tam olarak boyle geldi ve bizim ilk denetimimiz bunu
-#      kacirdigi icin sonraki anahtarlar sessizce bos dondu.
-# (?<!is): sayfadaki "isDisplayCaptcha" kimligi her zaman var ve degeri
-# false olabilir; onu captcha sanmamak icin yalnizca bagimsiz gecen
-# "DisplayCaptcha" yakalaniyor.
-CAPTCHA_BAYRAGI_RE = re.compile(
-    r"""id\s*=\s*["']isDisplayCaptcha["'][^>]*>\s*true|(?<!is)DisplayCaptcha""",
-    re.IGNORECASE)
+# Sunucu captcha isteyip istemedigini IKI ayri yerde bildiriyor ve
+# ikisi FARKLI YERDE denetlenmeli:
+#
+#   1. ACILIS SAYFASINDA bir bayrak: <span id="isDisplayCaptcha">true</span>
+#      Sitenin kendi isDisplayCaptcha() fonksiyonu bunu okuyor.
+#   2. API CEVABINDA metadata.FMTE icinde "DisplayCaptcha" gecmesi.
+#
+# ONCEKI SURUM IKISINI TEK DESENDE ARIYORDU VE ACILIS SAYFASINDA YANLIS
+# ALARM VERIYORDU. Sayfanin kendi JavaScript kaynaginda su satir var:
+#
+#     if(response.metadata.FMTE.indexOf("DisplayCaptcha") > -1){
+#
+# Bu, sitenin captcha'yi DENETLEYEN kodu -- captcha'nin acik oldugunu
+# degil. Desen bu dizgiyi yakalayip "captcha istendi" diye durdu ve
+# Danistay cekimi 40 kararda kaldi. Bayrak o sirada "false" idi;
+# yani captcha hic acilmamisti.
+#
+# Ders: bir sayfanin KAYNAK KODUNDA gecen bir kelime, o durumun
+# gerceklestigi anlamina gelmiyor.
+SAYFA_CAPTCHA_RE = re.compile(
+    r"""id\s*=\s*["']isDisplayCaptcha["'][^>]*>\s*true""", re.IGNORECASE)
+API_CAPTCHA_RE = re.compile(r"DisplayCaptcha")
 
 
 class CaptchaAcik(RuntimeError):
@@ -133,13 +144,18 @@ class DanistayClient:
             log.warning("acilis sayfasi alinamadi: %s", exc)
 
     @staticmethod
-    def _captcha_denetle(metin: str) -> None:
+    def _captcha_denetle(metin: str, *, api: bool = False) -> None:
         """Sunucu captcha istiyorsa isi durdurur.
 
         Bilerek COZULMUYOR. Bot denetimini atlatmak bu projenin sinirinin
         disinda; boyle bir durumda isi insan devralmali.
+
+        api=False (acilis sayfasi): YALNIZCA bayragin degerine bakilir.
+        api=True  (API cevabi): metinde "DisplayCaptcha" gecmesi yeterli.
+        Ayrim sart -- sayfanin JavaScript kaynaginda o dizgi zaten var.
         """
-        if CAPTCHA_BAYRAGI_RE.search(metin or ""):
+        desen = API_CAPTCHA_RE if api else SAYFA_CAPTCHA_RE
+        if desen.search(metin or ""):
             raise CaptchaAcik("Danistay captcha istedi; otomatik cekim durduruldu.")
 
     def _bekle(self) -> None:
@@ -163,7 +179,7 @@ class DanistayClient:
         self._bekle()
         try:
             baslat = self.session.post(BASLAT_UCU, json={"data": govde}, timeout=60)
-            self._captcha_denetle(baslat.text)
+            self._captcha_denetle(baslat.text, api=True)
         except requests.RequestException as exc:
             log.warning("arama baslatilamadi (%s): %s", kelime, exc)
             return []
@@ -175,7 +191,7 @@ class DanistayClient:
             istek = {"data": {**govde, "pageSize": sayfa_boyu, "pageNumber": sayfa}}
             try:
                 cevap = self.session.post(ARAMA_UCU, json=istek, timeout=60)
-                self._captcha_denetle(cevap.text)
+                self._captcha_denetle(cevap.text, api=True)
                 govde_cevap = cevap.json() or {}
                 veri = govde_cevap.get("data")
                 if veri is None:
@@ -229,7 +245,7 @@ class DanistayClient:
                     params={"id": karar_id, "arananKelime": f'"{anahtar}"' if anahtar else ""},
                     timeout=60)
                 r.raise_for_status()
-                self._captcha_denetle(r.text)
+                self._captcha_denetle(r.text, api=True)
                 ham = r.text or ""
                 if ham:
                     break

@@ -66,27 +66,43 @@ Kurallar:
    değilsen daha genel ama doğru olan terimi yaz.
 3. Açıklama yapma, tırnak kullanma, cümle kurma.
 4. Soru hukuki değilse ya da terim çıkaramıyorsan yalnızca YOK yaz.
+5. Terimden sonra "|" koyup hangi yüksek mahkemede aranacağını yaz:
+   YARGITAY  -> kişiler arası uyuşmazlıklar ve bütün ceza davaları
+                (boşanma, miras, kira, iş, ticaret, tazminat, suç)
+   DANISTAY  -> kişi ile DEVLET arasındaki uyuşmazlıklar
+                (memur, disiplin, atama, vergi, imar, kamulaştırma,
+                 ruhsat, ihale, öğrenci işleri)
 
 Örnekler:
 Olay: babam ölmeden önce tapuyu kardeşime devretmiş, pay alabilir miyim
-Terim: muris muvazaası
+Terim: muris muvazaası | YARGITAY
 
 Olay: kiracı iki kez ihtar aldı, tahliye edebilir miyim
-Terim: iki haklı ihtar nedeniyle tahliye
+Terim: iki haklı ihtar nedeniyle tahliye | YARGITAY
 
 Olay: başkası markamı izinsiz kullanıyor, ne yapabilirim
-Terim: markaya tecavüz
+Terim: markaya tecavüz | YARGITAY
 
 Olay: patentimi taklit ettiler, tazminat isteyebilir miyim
-Terim: patent hakkına tecavüz
+Terim: patent hakkına tecavüz | YARGITAY
 
 Olay: komşum arsamı kullanıyor, kira gibi bedel isteyebilir miyim
-Terim: ecrimisil
+Terim: ecrimisil | YARGITAY
+
+Olay: memura verilen kademe ilerlemesinin durdurulması cezası iptal olur mu
+Terim: disiplin cezasının iptali | DANISTAY
+
+Olay: belediye imar planını değiştirdi, arsam yeşil alan oldu
+Terim: imar planının iptali | DANISTAY
+
+Olay: vergi cezası kesildi, itiraz edebilir miyim
+Terim: vergi ceza ihbarnamesinin iptali | DANISTAY
 
 Olay: kahve nasıl demlenir
 Terim: YOK"""
 
-ISTEM = "Olay: {soru}\n\nYargıtay'da aranacak hukuki terim:"
+ISTEM = ("Olay: {soru}\n\n"
+         "Aranacak hukuki terim ve hangi yüksek mahkemede aranacağı:")
 
 # Terim bundan uzunsa model kural disina cikmis demektir; kelime yigini
 # Yargitay aramasinda OR'lanip alakasiz sonuc getiriyor.
@@ -134,20 +150,54 @@ YETERSIZ_SINIR = 2
 CANLI_BIRIKIM = config.RAW_DIR / "canli_kararlar.json"
 
 
-def arama_terimi(soru: str, uretici) -> str:
-    """Olayi Yargitay aramasinda ise yarayacak hukuki terime cevirir."""
+def arama_hedefi(soru: str, uretici) -> tuple[str, str]:
+    """Olayi (hukuki terim, mahkeme) ciftine cevirir.
+
+    MAHKEME NEDEN SORULUYOR
+    Turkiye'de yargi ikiye ayriliyor ve ikisinin karar arsivi AYRI:
+
+        Yargitay  kisiler arasi uyusmazliklar + butun ceza davalari
+        Danistay  kisi ile DEVLET arasindaki uyusmazliklar
+                  (memur, disiplin, vergi, imar, kamulastirma, ihale)
+
+    Yanlis arsivde aramak bos sonuc demek. Memur disiplin cezasi
+    Yargitay'da yok; orada aramak "bu konuda karar bulunamadi" der,
+    oysa Danistay'da binlercesi var.
+
+    Mahkeme AYRI BIR CAGRI ILE sorulmuyor: terim uretilirken ayni
+    istemde soruluyor, yani ek maliyet ve ek gecikme yok.
+
+    Doner: (terim, "yargitay" | "danistay"). Terim uretilemezse ("", "").
+    """
     try:
         c = uretici._gemini(ISTEM.format(soru=soru), sistem=SISTEM,
                             model=config.GEMINI_HIZLI_MODEL)
     except Exception as exc:
         log.warning("arama terimi uretilemedi: %s", str(exc)[:80])
-        return ""
-    terim = (c or "").strip().strip('"').strip()
+        return "", ""
+    ham = (c or "").strip().strip('"').strip()
     # HyDE'de ogrenildi: istem "terim yaz" diye emrederse model hukuki
     # olmayan soruyu da zorla terime cevirmeye calisiyor. Cikis yolu sart.
-    if terim.upper().startswith("YOK") or len(terim) < 3:
-        return ""
-    return terim[:EN_FAZLA_TERIM_KARAKTER]
+    if ham.upper().startswith("YOK") or len(ham) < 3:
+        return "", ""
+
+    mahkeme = "yargitay"
+    if "|" in ham:
+        terim, _, kuyruk = ham.partition("|")
+        if "DANI" in kuyruk.upper():
+            mahkeme = "danistay"
+    else:
+        # Model kurali atlamis olabilir; terim yine kullanilir.
+        terim = ham
+    terim = terim.strip().strip('"').strip()
+    if len(terim) < 3:
+        return "", ""
+    return terim[:EN_FAZLA_TERIM_KARAKTER], mahkeme
+
+
+def arama_terimi(soru: str, uretici) -> str:
+    """Yalnizca terim; mahkeme gerekmeyen cagiranlar icin."""
+    return arama_hedefi(soru, uretici)[0]
 
 
 class CanliKararArayici:
@@ -161,9 +211,21 @@ class CanliKararArayici:
         self.uretici = uretici
         self.reranker = reranker
         self._istemci = istemci
+        self._danistay = None
         self.son_terim = ""
+        self.son_mahkeme = ""
 
-    def _istemciyi_kur(self):
+    def _istemciyi_kur(self, mahkeme: str = "yargitay"):
+        """Ilgili mahkemenin istemcisini doner, bir kez kurar.
+
+        Iki AYRI arsiv var ve ikisi ayri sitede. Yanlis arsivde aramak
+        bos sonuc demek: memur disiplin cezasi Yargitay'da yok.
+        """
+        if mahkeme == "danistay":
+            if self._danistay is None:
+                from scraper.danistay import DanistayClient
+                self._danistay = DanistayClient(delay=0.5)
+            return self._danistay
         if self._istemci is None:
             from scraper.ictihat import EmsalClient
             # Gecikme kisa: tek soruluk kisa istek 429 uretmiyor ve
@@ -205,13 +267,14 @@ class CanliKararArayici:
             log.warning("canli birikim yazilamadi: %s", str(exc)[:80])
 
     def ara(self, soru: str, limit: int = 3) -> list[dict]:
-        terim = arama_terimi(soru, self.uretici)
+        terim, mahkeme = arama_hedefi(soru, self.uretici)
         self.son_terim = terim
+        self.son_mahkeme = mahkeme
         if not terim:
             return []
 
         try:
-            istemci = self._istemciyi_kur()
+            istemci = self._istemciyi_kur(mahkeme)
             kayitlar = istemci.ara(terim, en_fazla=CANLI_ADET,
                                    sayfa_boyu=CANLI_ADET)
         except Exception as exc:
@@ -228,16 +291,33 @@ class CanliKararArayici:
                          len(adaylar))
                 break
             try:
-                metin = istemci.belge(k.id)
+                if mahkeme == "danistay":
+                    # Danistay ham HTML donuyor; Yargitay istemcisi
+                    # temizligi kendi yapiyor.
+                    #
+                    # KUNYE MUTLAKA ATILMALI. Danistay karari uzun bir
+                    # usul basligiyla basliyor (TEMYIZ EDEN, VEKILI,
+                    # DAVALI, DAVANIN KONUSU...). Eleme modeli metnin
+                    # basini okudugu icin bu basliktan oteye gecemiyor
+                    # ve alaka puani cok dusuk cikiyordu -- olculdu,
+                    # Danistay kararlari 0,03-0,17 alirken Yargitay
+                    # kararlari 0,999 aliyordu. Ayni havuzda
+                    # birlestirilince Danistay hep dibe gomuluyordu.
+                    from scraper.karar_parser import html_metne, kunye_at
+                    metin = kunye_at(html_metne(istemci.belge(k.id, terim)))
+                else:
+                    metin = istemci.belge(k.id)
             except Exception as exc:
                 log.debug("canli belge alinamadi (%s): %s", k.id, exc)
                 continue
             if not metin:
                 continue
+            ad = "Danıştay" if mahkeme == "danistay" else "Yargıtay"
             adaylar.append({
                 "karar_id": k.id,
                 "chunk_id": f"canli-{k.id}",
-                "kisa_ad": f"Yargıtay {k.daire} {k.esas_no} E. {k.karar_no} K.",
+                "kisa_ad": f"{ad} {k.daire} {k.esas_no} E. {k.karar_no} K.",
+                "mahkeme": ad,
                 "daire": k.daire,
                 "esas_no": k.esas_no,
                 "karar_no": k.karar_no,

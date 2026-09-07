@@ -29,7 +29,30 @@ from dataclasses import dataclass, asdict, field
 # Kararin basindaki kunye. Bilgi tasimiyor, indekste gurultu yaratiyor:
 # taraf adlari anonimlestirilmis, dosya numaralari aramaya yaramiyor.
 KUNYE_KALIPLARI = [
-    re.compile(r"^\s*\"?İçtihat Metni\"?\s*$", re.IGNORECASE),
+    # "İçtihat Metni" tek basina durabildigi gibi ardina T.C. de
+    # eklenebiliyor (Danistay boyle veriyor); satir sonu sart degil.
+    re.compile(r"^\s*\"?İçtihat Metni\"?\s*(T\.?C\.?)?\s*$", re.IGNORECASE),
+
+    # --- DANISTAY KUNYESI ---
+    # Danistay karari Yargitay'dan FARKLI bir baslikla basliyor ve
+    # eski kaliplar bunu tanimiyordu. Sonuc olculdu: eleme modeli
+    # metnin basini okudugu icin usul basligindan oteye gecemiyor ve
+    # Danistay kararlari 0,03-0,17 alirken Yargitay kararlari 0,999
+    # aliyordu -- ayni havuzda birlestirilince Danistay hep dibe
+    # gomuluyordu.
+    re.compile(r"^\s*Karar\s+İçeriği\s*$", re.IGNORECASE),
+    re.compile(r"^\s*(DANIŞTAY|Danıştay).*\d{4}/\d+\s*E\.?.*$"),
+    re.compile(r"^\s*(?:[A-ZÇĞİÖŞÜ]+\s+){0,3}DAİRES[İI]?\s*(BAŞKANLIĞI)?\s*$",
+               re.IGNORECASE),
+    re.compile(r"^\s*(?:BİRİNCİ|İKİNCİ|ÜÇÜNCÜ|DÖRDÜNCÜ|BEŞİNCİ|ALTINCI|"
+               r"YEDİNCİ|SEKİZİNCİ|DOKUZUNCU|ONUNCU|ONBİRİNCİ|ONİKİNCİ|"
+               r"ONÜÇÜNCÜ|ONDÖRDÜNCÜ|ONBEŞİNCİ)\s+DAİRE\s*$", re.IGNORECASE),
+    re.compile(r"^\s*İDAR[İI]\s+DAVA\s+DA[İI]RELER[İI]\s+KURULU\s*$",
+               re.IGNORECASE),
+    re.compile(r"^\s*(TEMYİZ\s+EDEN|KARŞI\s+TARAF|VEKİLİ|VEKİLLERİ|"
+               r"MÜDAHİL|İSTEMİN\s+ÖZETİ)\b.*:.*$", re.IGNORECASE),
+    re.compile(r"^\s*(YARGILAMA\s+SÜRECİ|DAVA\s+KONUSU\s+İSTEM)\s*:?\s*$",
+               re.IGNORECASE),
     re.compile(r"^\s*(Mahkemesi|Dava Türü|Davacı|Davalı|Taraflar|Dava|İlgili Kanun)"
                r"\s*:.*$", re.IGNORECASE),
     re.compile(r"^\s*YARGITAY\s+(İLAMI|KARARI|\d+)\s*$", re.IGNORECASE),
@@ -146,6 +169,68 @@ def kunye_at(metin: str) -> str:
             continue
         tutulan.append(s)
     return "\n".join(tutulan).strip()
+
+
+# Danistay kararinda gerekcenin basladigi yer. Yargitay'da bu yaklasim
+# DENENDI VE REDDEDILDI (yukaridaki modul aciklamasina bak: aranan isaret
+# 15 kararin hicbirinde yoktu). Danistay FARKLI, olculdu -- onbellekteki
+# 56 kararda:
+#
+#     GEREĞİ GÖRÜŞÜLDÜ        56/56   (%100)
+#     HUKUKİ DEĞERLENDİRME    50/56   (%89)
+#
+# Yani burada isaret guvenilir. Ayni teknigin bir arsivde yanlis, otekinde
+# dogru olmasi tuhaf degil: iki mahkemenin karar yazim gelenegi ayri.
+DANISTAY_GEREKCE_RE = re.compile(
+    r"(HUKUK[İI]\s+DE[ĞG]ERLEND[İI]RME|GERE[ĞG][İI]\s+G[ÖO]R[ÜU][ŞS][ÜU]LD[ÜU])",
+    re.IGNORECASE)
+
+
+def danistay_gerekce(metin: str) -> str:
+    """Danistay kararinin USUL kismini atip gerekceden baslatir.
+
+    NEDEN: Danistay karari uzun bir usul basligiyla basliyor ve icindeki
+    isimler zaten "..." ile anonimlestirilmis:
+
+        İSTEMİN KONUSU : ... Bölge İdare Mahkemesi ... tarih ve
+        E:..., K:... sayılı ısrar kararının temyizen incelenerek
+        bozulması istenilmektedir.
+
+    Bu paragraflarda bilgi yok. Eleme modeli metnin BASINI okudugu icin
+    ozu hic gormuyor ve alaka puani cok dusuk cikiyordu. Olculdu:
+
+        ham metin              0,061
+        kunye satirlari atik   0,537
+        gerekceden baslat      asagida
+
+    Isaret bulunamazsa metin OLDUGU GIBI doner -- kirpmak, yanlis yerden
+    kirpmaktan iyidir.
+
+    OLCULDU VE KULLANILMIYOR
+    Ayni 12 karar uzerinde dort yontem karsilastirildi (alaka puani):
+
+        yontem       en iyi   ilk 3'un ortalamasi
+        ham metin     0,757        0,696
+        kunye_at      0,845        0,769   <- SECILEN
+        kunye + GG    0,968        0,584
+        kunye + HD    0,696        0,444
+
+    "Gerekceden baslat" TEK BIR kararda en yuksek puani aliyor (0,968)
+    ama ILK UCUN ORTALAMASINI dusuruyor: birini kurtarip otekileri
+    bozuyor. Avukata uc karar gosteriliyor, dolayisiyla dogru olcu
+    ortalama -- tek bir zirve degil.
+
+    Fonksiyon ve testleri DURUYOR cunku olcumun kendisi degerli: bu
+    fikir bariz gorunuyor ve tekrar akla gelecek. Yeniden denemeden
+    once buraya bakilmali.
+    """
+    m = DANISTAY_GEREKCE_RE.search(metin or "")
+    if not m:
+        return metin
+    kalan = metin[m.start():].strip()
+    # Cok kisa kaldiysa isaret muhtemelen basliktan degil metin icinden
+    # gelmistir; tam metne don.
+    return kalan if len(kalan) >= 400 else metin
 
 
 def parcala(metin: str, boyut: int = PARCA_BOYU) -> list[str]:
