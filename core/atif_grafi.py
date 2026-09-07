@@ -44,7 +44,11 @@ MADDE_KEL = re.compile(
     r"[Mm]adde(?:sinin|lerinde|lerine|sine|leri|lerde|ler|sini|si|de|ye|yi|nin)?")
 
 # Capadan GERIYE okunacak parcalar
-SON_SAYI = re.compile(r"(\d{1,3})\s*(?:\.|" + ORD + r")?\s*$")
+# (?<!\d) ve 1-4 hane SART: onceki surum en fazla 3 hane okuyordu ve
+# sol tarafi sinirlamadigi icin "1201 inci maddeye" ifadesinden "201"
+# cikariyordu. Turk Ticaret Kanunu 1535, Turk Medeni Kanunu 1030
+# maddelik; bu maddeler yanlis maddelere baglaniyordu.
+SON_SAYI = re.compile(r"(?<!\d)(\d{1,4})\s*(?:\.|" + ORD + r")?\s*$")
 AYIRAC = re.compile(r"\s*(?:,|ve|ile|ila|–|-)\s*$")
 EK_ONEK = re.compile(r"(?:^|\s)(ek|geçici)\s*$", re.IGNORECASE)
 
@@ -85,12 +89,41 @@ ILISKI_IPUCLARI = [
 ILISKI_DERLI = [(ad, re.compile(k, re.IGNORECASE)) for ad, k in ILISKI_IPUCLARI]
 
 
+# Kanit metninin ekranda kaplayacagi yer. Cumle bundan uzunsa atfin
+# ETRAFINDAN pencere alinir; basindan degil.
+KANIT_UZUNLUK = 200
+
+
 def _cumle(metin: str, konum: int, yaricap: int = 240) -> str:
+    """Atfin gectigi cumleyi doner; ATIF HER ZAMAN ICINDE OLUR.
+
+    Onceki surum cumle basindan baslayip sabit uzunlukta kirpiyordu ve
+    hukuk metninde bu sik sik atfi disarida birakiyordu: "a)", "f)" gibi
+    bent isaretleri ve tarihlerdeki noktalar cumle sinirini yanlis yerde
+    buluyor, uzun bir liste cumlesi cikiyor, kirpma da atfa varmadan
+    bitiyordu. Ekranda "4857 sayili Kanunun 25 inci maddesi" yazmasi
+    gereken yerde onun oncesindeki bent listesi gorunuyordu.
+
+    Simdi: cumle kisa ise oldugu gibi, uzunsa atfin etrafindan pencere.
+    """
     bas = metin.rfind(".", max(0, konum - yaricap), konum)
     bas = bas + 1 if bas != -1 else max(0, konum - yaricap)
     son = metin.find(".", konum)
     son = son + 1 if son != -1 else min(len(metin), konum + yaricap)
-    return " ".join(metin[bas:son].split())
+    cumle = " ".join(metin[bas:son].split())
+
+    if len(cumle) <= KANIT_UZUNLUK:
+        return cumle
+
+    # Cumle uzun: atfi ortalayan bir pencere al. Atif ifadesi ("25 inci
+    # maddesinin ...") sagda devam ettigi icin agirlik saga veriliyor.
+    sol = max(bas, konum - 100)
+    sag = min(son, konum + KANIT_UZUNLUK - 100)
+    parca = metin[sol:sag]
+    # Kelime ortasindan baslamasin
+    if sol > bas and " " in parca:
+        parca = parca[parca.index(" ") + 1:]
+    return ("… " if sol > bas else "") + " ".join(parca.split()) +            ("…" if sag < son else "")
 
 
 def _hedef_kanun(metin: str, konum: int, kendi_no: str, pencere: int = 150) -> str:
@@ -163,7 +196,7 @@ def maddeden_atiflar(kayit: dict) -> list[dict]:
                 "kaynak": f"{kendi_no}-{kendi_madde}",
                 "hedef": f"{hedef_kanun}-{no}",
                 "iliski": iliski,
-                "kanit": c[:200],
+                "kanit": c,
             })
     return kenarlar
 

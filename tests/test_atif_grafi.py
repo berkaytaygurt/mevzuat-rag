@@ -81,3 +81,51 @@ def test_graf_yoksa_site_calismaya_devam_eder(tmp_path):
     assert g.hazir_mi() is False
     assert g.atiflar("4857", "19") == []
     assert g.atif_yapanlar("4857", "19") == []
+
+
+def test_kanit_her_zaman_atfi_iceriyor():
+    """Kanit cumlesi, kanitlamasi gereken atfi ICERMELI.
+
+    Onceki surum cumle basindan baslayip sabit uzunlukta kirpiyordu.
+    Hukuk metninde "a)", "f)" bent isaretleri ve tarihlerdeki noktalar
+    cumle sinirini yanlis yerde buluyor; uzun bir liste cumlesi cikiyor
+    ve kirpma atfa varmadan bitiyordu. Ekranda "4857 sayili Kanunun 25
+    inci maddesi" yazmasi gereken yerde onun oncesindeki bent listesi
+    gorunuyordu.
+    """
+    uzun = ("a) Kaçakçılık, vergi kaçakçılığı veya haksız mal edinme "
+            "suçlarından mahkûm olmamak, f) Görevini devamlı yapmasına engel "
+            "herhangi bir özrü bulunmamak, g) Birlikler ve TİM dahil, herhangi "
+            "bir işyerinden, 4857 sayılı İş Kanununun 25 inci maddesinin "
+            "birinci fıkrasının ikinci bendinde belirtilen nedenlerle işten "
+            "çıkarılmamış olmak")
+    k = maddeden_atiflar({"metin": uzun, "mevzuat_no": "13399", "madde_no": "8"})
+    assert k, "atif bulunamadi"
+    kanit = k[0]["kanit"]
+    assert "25 inci madde" in kanit, kanit
+    assert len(kanit) < 260, len(kanit)
+
+
+def test_kisa_cumle_oldugu_gibi_kaliyor():
+    k = maddeden_atiflar(madde(
+        "Bu Kanun, 4 üncü Maddedeki istisnalar dışında uygulanır."))
+    assert not k[0]["kanit"].startswith("…")
+
+
+def test_dort_haneli_madde_numarasi():
+    """Turk Ticaret Kanunu 1535, Turk Medeni Kanunu 1030 maddelik.
+
+    Onceki surum en fazla 3 hane okuyor ve sol tarafi sinirlamadigi icin
+    "1201 inci maddeye" ifadesinden "201" cikariyordu -- yani dort haneli
+    maddeler yanlis maddelere baglaniyordu.
+    """
+    k = maddeden_atiflar(madde(
+        "bu navlunu teminat altına almak üzere 1201 inci maddeye göre "
+        "tanınan hapis hakkına sahiptir.", no="6102", madde_no="1136"))
+    assert [e["hedef"] for e in k] == ["6102-1201"], k
+
+
+def test_uc_haneli_madde_bozulmadi():
+    k = maddeden_atiflar(madde("344 üncü maddesi uyarınca.", no="6098",
+                               madde_no="1"))
+    assert [e["hedef"] for e in k] == ["6098-344"], k
