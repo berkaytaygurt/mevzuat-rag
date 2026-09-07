@@ -25,6 +25,21 @@ bastan gommek (4 saat) yerine ~55 bin cocuk gomuluyor (~40 dakika) ve
 mevcut vektorler gecerli kaliyor.
 
 Arama cocukta yapilir, kullaniciya PARENT maddenin tamami doner.
+
+SONUC: OLCULDU, ISE YARAMADI, KAPATILDI
+Yukaridaki 0,151 rakami SAF VEKTOR aramasindan alinmisti. Gercek hibrit
+hatta BM25 maddenin tamamini gordugu icin kuyruk zaten bulunuyordu. Tam
+hatta olculdu (40 uzun madde + 34 soruluk set):
+
+    kuyruk testi   cocuk kapali MRR 0,249  ->  acik 0,244
+    olcum seti     cocuk kapali MRR 0,734  ->  acik 0,688 (1. sirada 23 -> 20)
+
+Kuyrugu duzeltmiyor, genel isabeti dusuruyor: cocuklar RRF'e uzun
+maddeler icin fazladan aday sokup siralamayi seyreltiyor.
+
+Kod ve testler DURUYOR cunku olcumun kendisi degerli -- "small-to-big"
+tarifi her sisteme uymuyor ve bunu bir daha denemeden once burasi
+okunmali. COCUK_ARAMA=1 ile acilabilir.
 """
 from __future__ import annotations
 

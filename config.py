@@ -225,10 +225,19 @@ METRIK_YOLU = ROOT / "data" / "metrik.jsonl"
 # maddesi, saf vektor aramasi): maddenin BASINDAN alinan ifade 36/40
 # bulunuyor, SONUNDAN alinan 13/40.
 #
-# Cocuk parcalar yalnizca pencereye sigmayan kuyrugu kapsiyor; arama
-# cocukta yapilsa da sonuc ANA maddedir. Cocuk indeksi yoksa arama
-# eskisi gibi calisir.
-COCUK_ARAMA = os.getenv("COCUK_ARAMA", "1") not in ("0", "false", "hayir")
+# OLCULDU VE KAPATILDI. Fikir dogruydu ama sorun ZATEN COZULMUSTU:
+# BM25 maddenin tamamini goruyor, pencere siniri yok. Yukaridaki 0,151
+# rakami SAF VEKTOR aramasindan; gercek hibrit hatta kuyruk zaten
+# bulunuyordu. Tam arama hattinda olculdu (40 uzun madde + 34 soruluk set):
+#
+#     kuyruk testi   cocuk kapali MRR 0,249  ->  acik 0,244
+#     olcum seti     cocuk kapali MRR 0,734  ->  acik 0,688  (1. sirada 23 -> 20)
+#
+# Yani kuyrugu duzeltmiyor, genel isabeti DUSURUYOR: cocuklar RRF'e uzun
+# maddeler icin fazladan aday sokuyor ve siralamayi seyreltiyor. Kod ve
+# testler duruyor (hat degisirse yeniden olculebilir), indeks dosyalari
+# silindi.
+COCUK_ARAMA = os.getenv("COCUK_ARAMA", "0") not in ("0", "false", "hayir")
 
 
 # --- HyDE ---
