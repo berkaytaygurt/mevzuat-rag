@@ -277,6 +277,42 @@
   .madde.acik .madde-govde, .karar.acik .madde-govde { display: block; }
   /* Fikralar ayri paragraf: yedi fikrali bir madde tek blok halinde
      okunamiyor, avukat aradigi fikrayi gozle bulamiyordu. */
+  /* Madde -> madde atif grafi. Kanunun kendi metninden cikarilan
+     caprazlar; D3 ile ag cizmek yerine okunabilir liste tercih edildi --
+     999 dugumluk kuvvet-yonlu graf ekranda sac yumagi oluyor, avukatin
+     istedigi ise "nereye bagli, ne sekilde". */
+  .graf {
+    margin-top: 14px; padding-top: 12px;
+    border-top: 1px dashed var(--kenar);
+  }
+  .graf-basligi {
+    font-size: 11px; letter-spacing: .06em; text-transform: uppercase;
+    color: var(--metin-sol); font-weight: 600; margin-bottom: 8px;
+  }
+  .graf-alt {
+    font-size: 12px; color: var(--metin-sol); margin: 10px 0 5px;
+  }
+  .graf-satir {
+    padding: 5px 0 5px 11px; margin-bottom: 4px;
+    border-left: 2px solid var(--kenar);
+    font-family: var(--sans); font-size: 13.5px; line-height: 1.5;
+  }
+  .graf-iliski {
+    font-size: 11px; font-weight: 600; color: var(--vurgu);
+    background: var(--vurgu-bg); padding: 1px 7px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .graf-madde { font-weight: 600; }
+  .graf-baslik { color: var(--metin-orta); }
+  .graf-kanit {
+    margin-top: 3px; font-family: var(--serif); font-size: 13px;
+    font-style: italic; color: var(--metin-sol); line-height: 1.5;
+  }
+  .graf-liste { display: flex; flex-wrap: wrap; gap: 5px; }
+  .graf-rozet {
+    font-size: 12px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--kenar); color: var(--metin-orta);
+  }
   .fikra { margin: 0 0 11px; }
   .fikra:last-child { margin-bottom: 0; }
   .madde-dip {
@@ -685,6 +721,45 @@ function maddeMetni(m) {
     : "");
 }
 
+// Maddenin BASKA MADDELERLE bagi. Kanunun kendi metninden cikarildi:
+// "Bu Kanun, 4 uncu Maddedeki istisnalar disinda ..." Vektor aramasi bu
+// bagi goremiyor; m.1'i getirip m.4'ten habersiz kaliyor.
+//
+// Kanit cumlesi kanunun KENDI metninden birebir alinti; uretilmis ozet
+// degil. Graf yoksa bolum hic cizilmiyor.
+function grafBaglantilari(m) {
+  const g = m.graf;
+  if (!g) return "";
+  const yap = g.yapilan || [], al = g.alinan || [];
+  if (!yap.length && !al.length) return "";
+
+  let h = '<div class="graf"><div class="graf-basligi">Bağlantılı maddeler</div>';
+
+  if (yap.length) {
+    h += '<div class="graf-alt">Bu madde şunlara gönderme yapıyor</div>';
+    for (const x of yap) {
+      h += '<div class="graf-satir">' +
+        '<span class="graf-iliski">' + kacis(x.iliski || "") + "</span> " +
+        '<span class="graf-madde">' + kacis(x.mevzuat_adi || x.mevzuat_no) +
+        " m." + kacis(x.madde_no) + "</span>" +
+        (x.baslik ? ' <span class="graf-baslik">' + kacis(x.baslik) + "</span>" : "") +
+        (x.kanit ? '<div class="graf-kanit">' + kacis(x.kanit) + "</div>" : "") +
+        "</div>";
+    }
+  }
+  if (al.length) {
+    h += '<div class="graf-alt">Bu maddeye gönderme yapanlar · ' + al.length + "</div>";
+    h += '<div class="graf-liste">';
+    for (const x of al) {
+      h += '<span class="graf-rozet">' +
+        kacis(x.mevzuat_adi || x.mevzuat_no) + " m." + kacis(x.madde_no) +
+        "</span>";
+    }
+    h += "</div>";
+  }
+  return h + "</div>";
+}
+
 function yorumlayanlar(m) {
   const k = m.yorumlayan_kararlar;
   if (!k || !k.length) return "";
@@ -835,7 +910,7 @@ function dayanakPaneli(d) {
         "</div>" +
         '<div class="madde-govde">' + maddeMetni(m) +
           (m.bolum ? '<div class="madde-dip">' + kacis(m.bolum) + "</div>" : "") +
-          yorumlayanlar(m) +
+          grafBaglantilari(m) + yorumlayanlar(m) +
         "</div></div>";
     });
     h += "</div>";
@@ -860,7 +935,7 @@ function karsiPaneli(kt) {
         '<span class="madde-baslik">' +
           kacis(m.mevzuat_adi) + (m.baslik ? " — " + kacis(m.baslik) : "") +
         "</span></div>" +
-      '<div class="madde-govde">' + fikralara(m.metin) + yorumlayanlar(m) +
+      '<div class="madde-govde">' + fikralara(m.metin) + grafBaglantilari(m) + yorumlayanlar(m) +
       "</div></div>";
   });
   return h + "</div>";

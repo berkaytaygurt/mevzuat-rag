@@ -87,6 +87,27 @@ def kaynaklar():
         except Exception as exc:
             log.warning("atif zinciri yuklenemedi: %s", exc)
 
+        # Madde -> madde atif grafi: kanunun KENDI metnindeki caprazlar.
+        # "Bu Kanun, 4 uncu Maddedeki istisnalar disinda ..." diyen bir
+        # hukum, m.4'e bakilmadan anlasilmaz; vektor aramasi bu bagi
+        # goremiyor. Graf yoksa site grafsiz calismaya devam eder.
+        _kaynaklar["graf"] = None
+        _kaynaklar["madde_adlari"] = {}
+        try:
+            from core.atif_grafi import AtifGrafi
+            g = AtifGrafi()
+            if g.hazir_mi():
+                _kaynaklar["graf"] = g
+                # "4857-4" avukata bir sey soylemiyor; kanun adi ve madde
+                # basligi lazim. Tek seferlik dizin.
+                _kaynaklar["madde_adlari"] = {
+                    f"{m.get('mevzuat_no')}-{m.get('madde_no')}": (
+                        m.get("mevzuat_adi", ""), m.get("baslik", ""))
+                    for m in store.tum_kayitlar()}
+                log.info("atif grafi bulundu: %d kenar", g.sayi())
+        except Exception as exc:
+            log.warning("atif grafi yuklenemedi: %s", exc)
+
         _kaynaklar["karar"] = None
         try:
             from core.karar_ara import KararArayici
@@ -203,6 +224,47 @@ def netlestir(istek: Netlestirme):
         puanli.append({"baslik": baslik, "puan": round(float(puan), 3)})
     puanli.sort(key=lambda x: x["puan"], reverse=True)
     return {"gerekli": True, "meseleler": puanli}
+
+
+# Iliski turlerinin kullaniciya gosterilecek adi. Ham etiket ("gonderme")
+# hukukcuya bir sey anlatmiyor.
+ILISKI_ADI = {
+    "istisna": "istisnası",
+    "yaptirim": "yaptırımı",
+    "gonderme": "gönderme yapıyor",
+    "degistirir": "değiştiriyor",
+    "mulga": "yürürlükten kaldırıyor",
+    "atif": "atıf yapıyor",
+}
+
+
+def graf_baglantilari(m: dict, kaynak: dict) -> dict:
+    """Maddenin yaptigi ve aldigi atiflar, okunabilir adlarla.
+
+    Kanit cumlesi kanunun KENDI metninden birebir aliniyor; uretilmis
+    ozet degil, yani uydurma riski yok.
+    """
+    g = kaynak.get("graf")
+    if g is None:
+        return {"yapilan": [], "alinan": []}
+    adlar = kaynak.get("madde_adlari", {})
+    no, madde_no = m.get("mevzuat_no", ""), str(m.get("madde_no", ""))
+
+    def coz(anahtar):
+        kanun, _, mad = anahtar.partition("-")
+        ad, baslik = adlar.get(anahtar, ("", ""))
+        return {"anahtar": anahtar, "mevzuat_no": kanun, "madde_no": mad,
+                "mevzuat_adi": ad, "baslik": baslik,
+                "kulliyatta": anahtar in adlar}
+
+    yapilan = []
+    for e in g.atiflar(no, madde_no)[:12]:
+        d = coz(e["hedef"])
+        d["iliski"] = ILISKI_ADI.get(e["iliski"], e["iliski"])
+        d["kanit"] = e.get("kanit", "")
+        yapilan.append(d)
+    alinan = [coz(a) for a in g.atif_yapanlar(no, madde_no)[:12]]
+    return {"yapilan": yapilan, "alinan": alinan}
 
 
 def vurgu_parcalari(metin: str, soru: str, kaynak: dict) -> list[dict]:
@@ -352,6 +414,7 @@ def sor(istek: Soru):
                 k["zincir"].kararlar(m.get("mevzuat_no", ""),
                                      str(m.get("madde_no", "")))
                 if k.get("zincir") else []),
+            "graf": graf_baglantilari(m, k),
             # Metin parcalari + hangisinin soruyla ilgili oldugu. Vurgu
             # yalnizca EMIN oldugunda konuluyor: yanlis yeri isaretlemek,
             # hic isaretlememekten kotu -- kullanici isaretli yeri okuyup

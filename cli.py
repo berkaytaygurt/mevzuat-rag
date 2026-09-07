@@ -480,6 +480,27 @@ def cmd_cocuk_indeksle(args) -> None:
              len(anahtarlar), config.INDEX_DIR / COCUK_VEKTOR)
 
 
+def cmd_atif_grafi(args) -> None:
+    """Kanun metnindeki madde -> madde atiflarindan graf kurar.
+
+    core/atif_zinciri.py KARAR -> MADDE yonunde calisiyor; bu farkli bir
+    is: kanunun KENDI metninin baska maddelere yaptigi atiflar ve iliski
+    turu ("istisnasidir", "yaptirimidir", "gonderme yapar").
+    """
+    from core.atif_grafi import grafi_kur, kaydet
+
+    if not MADDE_YOLU.exists():
+        sys.exit("Once 'python cli.py cek' calistirin.")
+    kayitlar = json.loads(MADDE_YOLU.read_text(encoding="utf-8"))
+    log.info("%d madde taraniyor", len(kayitlar))
+
+    graf = grafi_kur(kayitlar)
+    kaydet(graf)
+    kenar = sum(len(v) for v in graf["ileri"].values())
+    log.info("atif grafi: %d kenar | atif YAPAN %d madde | atif ALAN %d madde",
+             kenar, len(graf["ileri"]), len(graf["geri"]))
+
+
 def cmd_bm25(args) -> None:
     """Yalnizca BM25 indeksini yeniden kurar.
 
@@ -652,6 +673,10 @@ def main() -> None:
     cc = alt.add_parser("cocuk-indeksle",
                         help="uzun maddelerin kuyrugu icin cocuk vektorleri kur")
     cc.set_defaults(func=cmd_cocuk_indeksle)
+
+    ag = alt.add_parser("atif-grafi",
+                        help="kanun metnindeki madde -> madde atiflarini cikar")
+    ag.set_defaults(func=cmd_atif_grafi)
 
     cb = alt.add_parser("bm25", help="yalnizca BM25 indeksini yeniden kur")
     cb.set_defaults(func=cmd_bm25)
