@@ -97,14 +97,37 @@ class Reranker:
 
     @staticmethod
     def _madde_metni(k: dict) -> str:
-        """Cross-encoder'a verilecek metin. Kanun adi ve baslik da dahil:
-        madde govdesi cogu zaman konuyu tekrar etmiyor ("Ondort gunden az
-        olamaz" cumlesi tek basina neyin izni oldugunu soylemiyor)."""
+        """Cross-encoder'a verilecek metin.
+
+        Kanun adi ve baslik da dahil: madde govdesi cogu zaman konuyu
+        tekrar etmiyor ("Ondort gunden az olamaz" cumlesi tek basina
+        neyin izni oldugunu soylemiyor).
+
+        MAHKEME KARARLARI AYRI ALAN ADLARI KULLANIYOR ve bu fark uzun
+        sure gozden kacti. Karar kayitlarinda govde "metin"de degil
+        "gerekce"de duruyor; "mevzuat_adi", "madde_no", "baslik"
+        alanlarinin uecue de bos. Sonuc: cross-encoder her yerel karar
+        icin soruyu neredeyse BOS bir metinle karsilastiriyordu.
+
+        OLCULDU (ham cross-encoder puani, 6 soru):
+            yerel kararlar   0,000 0,000 0,000 0,000 0,000 0,006
+            canli kararlar   0,734 0,999 0,155 0,943 0,959 0,990
+
+        Sifir, kararin alakasiz olmasindan degil metnin hic
+        gorulmemesinden geliyordu. Siralama fiilen RRF'in %10'luk
+        payina kaliyor, yani yeniden siralama karar tarafinda hic
+        calismiyordu -- "muris muvazaasi" sorusunda 1. Hukuk Dairesi
+        yerine 3. Hukuk Dairesi gelmesinin sebebi bu.
+        """
+        # Karar kayitlarinda kimlik "kisa_ad"da: hangi daire, hangi esas.
+        # Madde tarafinda bos oldugu icin zararsiz.
         parcalar = [
-            k.get("mevzuat_adi", ""),
-            f"Madde {k.get('madde_no', '')}",
+            k.get("mevzuat_adi", "") or k.get("kisa_ad", ""),
+            f"Madde {k['madde_no']}" if k.get("madde_no") else "",
             k.get("baslik", ""),
-            k.get("metin", ""),
+            # Sirasi onemli: karar govdesi "gerekce", madde govdesi
+            # "metin". Ikisi de yoksa kararin tam metnine dusuluyor.
+            k.get("metin", "") or k.get("gerekce", "") or k.get("tam_metin", ""),
         ]
         return " | ".join(p for p in parcalar if p)
 

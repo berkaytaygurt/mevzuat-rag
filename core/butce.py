@@ -52,17 +52,37 @@ def bugun() -> dict:
 
 
 class ButceAsildi(RuntimeError):
-    """Gunluk istek tavanina ulasildi."""
+    """Gunluk istek ya da maliyet tavanina ulasildi."""
 
 
 def izin_iste() -> None:
-    """Bir istek yapmadan once cagrilir; tavan asildiysa istisna atar."""
+    """Bir istek yapmadan once cagrilir; tavan asildiysa istisna atar.
+
+    IKI tavan var, ikisi de gerekli:
+
+      istek sayisi -- hizli donen bir dongu Google'in kota limitine
+                      carpmadan once durdurulsun diye
+      MALIYET      -- asil koruma bu. Bir cagrinin maliyeti 100 kat
+                      degisiyor (terim cikarma ~200 token, cevap uretme
+                      ~20.000 token), dolayisiyla istek saymak parayi
+                      sinirlamiyor. Olculdu: 102 soruluk bir olcum turu
+                      tek gunde faturanin buyuk kismini olusturdu ve
+                      1500'luk istek tavanina hic yaklasmadi -- yani
+                      duvar hic devreye girmedi.
+    """
     with _kilit:
         v = bugun()
         if v["istek"] >= config.GEMINI_GUNLUK_SINIR:
             raise ButceAsildi(
-                f"Gunluk Gemini siniri doldu ({v['istek']}/"
+                f"Gunluk Gemini istek siniri doldu ({v['istek']}/"
                 f"{config.GEMINI_GUNLUK_SINIR}). Sinir config.GEMINI_GUNLUK_SINIR "
+                f"ile degistirilebilir.")
+        usd = tahmini_maliyet(v)
+        if usd >= config.GEMINI_GUNLUK_USD:
+            raise ButceAsildi(
+                f"Gunluk Gemini maliyet tavani doldu "
+                f"(~{usd:.2f}/{config.GEMINI_GUNLUK_USD:.2f} USD, "
+                f"~{usd * 42:.0f} TL). Sinir config.GEMINI_GUNLUK_USD "
                 f"ile degistirilebilir.")
 
 
@@ -87,8 +107,9 @@ def tahmini_maliyet(v: dict | None = None) -> float:
 
 def durum() -> str:
     v = bugun()
+    usd = tahmini_maliyet(v)
     return (f"bugun {v['istek']}/{config.GEMINI_GUNLUK_SINIR} istek, "
-            f"~{tahmini_maliyet(v):.3f} USD")
+            f"~{usd:.3f}/{config.GEMINI_GUNLUK_USD:.2f} USD (~{usd * 42:.1f} TL)")
 
 
 def toplu_is_onayi(adet: int, ortalama_girdi: int = 1500,

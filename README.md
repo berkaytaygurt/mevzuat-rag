@@ -108,8 +108,8 @@ Arayüz (**Aibars**):
 ```
 
 Sonra tarayıcıda `http://localhost:8000`. Sunucu yalnızca `localhost`'ta
-dinler, dışarıya bir şey göndermez, anahtar gerektirmez. Streamlit arayüzü
-de duruyor (`streamlit run app.py`) ama asıl arayüz Aibars.
+dinler; dışarıya açmak için `paylas.py` geçici bir tünel kurar ve şifre
+korumasını devreye sokar.
 
 Mahkeme kararları ayrı bir indekste tutulur:
 
@@ -179,4 +179,7 @@ tabi değildir.
 | `cli.py` | `katalog` / `cek` / `indeksle` / `sor` / `ictihat` / `danistay` |
 | `server.py` | Aibars web sunucusu (yalnızca localhost) |
 | `web/aibars.html` | Aibars arayüzü |
-| `app.py` | Streamlit arayüzü (alternatif) |
+| `core/canli_karar.py` | Yargıtay'dan canlı karar çekme |
+| `core/atif_grafi.py` | Madde-madde atıf grafiği |
+| `zincir_kur.py` | Hangi karar hangi maddeyi yorumlamış |
+| `AIBARS_TAM_RAPOR.md` | Sistemin tam anlatımı |

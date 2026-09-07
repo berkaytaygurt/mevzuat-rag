@@ -29,9 +29,31 @@ def _kod_satirlari() -> list[tuple[int, str]]:
     Turkce yorumlarda kesme isareti ("PDF'ten") ve dengesiz parantez
     ('bent duzeyinde ("a)")') dogal olarak geciyor ve sahte alarm
     uretiyordu. Denetlenmesi gereken KOD; duzyazi degil.
+
+    BLOK YORUMLAR da atlaniyor. Once yalnizca "//" satirlari
+    atlaniyordu; bir /* ... */ blogunda gecen bir kesme isareti
+    ("localStorage'inda") sahte alarm uretti. Ayni gerekce, ayni
+    cozum -- duzyazi denetim disi.
     """
-    return [(i, s) for i, s in enumerate(_script().split("\n"), 1)
-            if not s.lstrip().startswith("//")]
+    satirlar = []
+    blokta = False
+    for i, s in enumerate(_script().split(chr(10)), 1):
+        kirpik = s.strip()
+        if blokta:
+            if "*/" in kirpik:
+                blokta = False
+                kalan = kirpik.split("*/", 1)[1]      # kapanistan sonrasi kod
+                if kalan.strip():
+                    satirlar.append((i, kalan))
+            continue
+        if kirpik.startswith("//"):
+            continue
+        if kirpik.startswith("/*"):
+            if "*/" not in kirpik:
+                blokta = True
+            continue
+        satirlar.append((i, s))
+    return satirlar
 
 
 def test_tek_tirnakli_dizgide_kacissiz_tirnak_yok():

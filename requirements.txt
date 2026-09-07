@@ -21,7 +21,6 @@ google-genai>=0.3            # PROVIDER=gemini
 llama-cpp-python>=0.3        # PROVIDER=local
 
 # --- arayuz / CLI ---
-streamlit>=1.38
 python-dotenv>=1.0
 tqdm>=4.66
 

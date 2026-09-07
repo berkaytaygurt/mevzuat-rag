@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import secrets
 import time
 from pathlib import Path
@@ -118,8 +119,269 @@ def kaynaklar():
         except Exception as exc:
             log.warning("karar indeksi yuklenemedi, mevzuatla devam: %s", exc)
 
+        _kaynaklar["canli_karar"] = None
+        if config.CANLI_KARAR:
+            try:
+                from core.canli_karar import CanliKararArayici
+                _kaynaklar["canli_karar"] = CanliKararArayici(
+                    _kaynaklar["generator"],
+                    reranker=_kaynaklar["retriever"].reranker)
+                log.info("canli karar cekimi acik")
+            except Exception as exc:
+                log.warning("canli karar kurulamadi: %s", exc)
+
         log.info("hazir: %d madde", store.sayi())
     return _kaynaklar
+
+
+# Yerel kulliyattan bu sayidan az karar gelirse Yargitay'a canli cikilir.
+# 1 degil 2: tek bir karar cogu zaman konuya teget bir kararla eslesmis
+# oluyor ve avukata "emsal yok" demekten farksiz.
+CANLI_YEDEK_SINIRI = 2
+
+# ILK cevapta gosterilecek karar sayisi. Uc yeterli DEGIL ama dogru
+# cozum daha cok karar cekmek degil, ISTEGE BAGLI cekmek: panelde
+# "Daha fazla karar getir" dugmesi var ve ona basilinca 12 karar daha
+# geliyor.
+#
+# NEDEN: canli cekim her soruya 10-30 saniye ekliyordu ve Cloudflare
+# tunelinin origin zaman asimi 100 saniye -- asilinca istek "524" ile
+# tumden dusuyor, avukat cevabin TAMAMINI kaybediyor. Olculdu, site
+# 90 saniye-2 dakikaya cikmisti.
+KARAR_ADEDI = int(os.getenv("KARAR_ADEDI", "3"))
+
+# Yeniden siralayici puani bunun altindaysa gelen kararlar konuyla
+# yalnizca tesaduf eseri ortusuyor demektir. OLCULDU (ayni kulliyat,
+# ayni soru, tek fark sorgunun bicimi):
+#
+#   soru "babam olmeden once tapuyu kardesime devretmis, mirastan
+#         pay alabilir miyim"                -> 0,495 / 0,495 / 0,492
+#                                               (3. HD, 3. HD, 21. HD -- yanlis)
+#   terim "muris muvazaasi"                  -> 0,810 / 0,810
+#                                               (Hukuk Genel Kurulu -- dogru)
+#
+# Dogru kararlar KULLIYATTA ZATEN VARDI; ham cumleyle sorulduklari icin
+# bulunamiyorlardi. Iyi eslesmeler olculdugunde 0,81-0,90 bandinda
+# cikiyor, kotu eslesme 0,49. Esik ikisinin arasina konuldu.
+KARAR_SKOR_ESIGI = float(os.getenv("KARAR_SKOR_ESIGI", "0.65"))
+
+
+def _en_iyi_skor(kararlar: list[dict]) -> float:
+    """Iki havuzu kiyaslamak icin HAM cross-encoder puani.
+
+    Normalize edilmis "skor" alani bu is icin kullanilamaz; sebebi
+    _ce()'nin aciklamasinda. (_ce asagida tanimli; modul duzeyinde
+    oldugu icin cagri aninda ikisi de hazir.)
+    """
+    return _ce(kararlar)
+
+
+def _canli_once(k: dict, soru: str, guven_dusuk: bool) -> tuple[list[dict], str]:
+    """CANLI ana katman: once Yargitay'a cikilir, yerel yedektir.
+
+    NEDEN BOYLE
+    Onceden indirilen kulliyat elle yazilmis 55 anahtarlik bir listeyle
+    sinirliydi ve o listeyi bir insan yazdi, veriden cikarmadi. Nadir
+    konu sorulunca karar bolumu bos geliyordu -- Yargitay'da o konuda
+    yuz binlerce karar dururken. Canli katman bu siniri kaldiriyor:
+    kapsam artik indirdigimiz kadar degil, Yargitay'in tamami.
+
+    YEDEK NEDEN DURUYOR
+    Canli katman tek noktaya bagimli. Bunun teorik olmadigi olculdu:
+      - Yargitay 429 (Too Many Requests) donuyor; tek istemcili bir
+        cekimde 1.253 belge (%17) bu yuzden dustu
+      - Danistay tarafinda ayni risk GERCEKLESTI: captcha cikti, cekim
+        40 kararda durdu ve o alan hala bos
+    Yerel kulliyat olmasa boyle bir anda karar bolumu tumden olurdu.
+    Simdi yalnizca zayifliyor.
+
+    Doner: (kararlar, kaynak)
+    """
+    canli = k.get("canli_karar")
+    if guven_dusuk or canli is None:      # soru kulliyatla ilgisiz
+        return [], "yerel"
+    try:
+        ek = canli.ara(soru, limit=KARAR_ADEDI)
+    except Exception as exc:              # ag hatasi cevabi engellememeli
+        log.warning("canli karar cekimi basarisiz: %s", str(exc)[:120])
+        return [], "yerel"
+    return ek, "canli"
+
+
+def _ce(kararlar: list[dict]) -> float:
+    """En iyi HAM cross-encoder puani.
+
+    "skor" alani KULLANILAMAZ: yeniden siralayici onu havuz icinde
+    min-max normalize ediyor, yani birinci sira her zaman 1,0 aliyor.
+    Canli kararlarda RRF puani olmadigi icin sonuc daima 0,95 x 0,90 =
+    0,855 cikiyordu -- kalitesinden bagimsiz bir sabit. Iki farkli
+    havuzu kiyaslamanin tek dogru yolu ham cross-encoder puani.
+    """
+    return max((k.get("ce_skor", -1.0) for k in kararlar), default=-1.0)
+
+
+def _en_iyi_kararlar(k: dict, soru: str,
+                     guven_dusuk: bool) -> tuple[list[dict], str]:
+    """Canli ANA katman; yerel arsiv de bakilir, iyi olan gosterilir.
+
+    NEDEN IKISI DE
+    Canli katman kapsami acti: artik indirdigimiz kadariyla sinirli
+    degiliz. Ama olculdu -- ustunluk soruya gore degisiyor (6 soru, ham
+    cross-encoder puani):
+
+        soru                       yerel  yerel+terim  canli
+        kidem tazminati            0,949      0,983    0,738
+        iki hakli ihtar tahliye    0,999      0,999    0,999
+        muris muvazaasi            0,001      0,616    0,088
+        marka hukumsuzlugu         0,103      0,356    0,949
+        patent tecavuzu            0,005      0,016    0,948
+        cekte zamanasimi           0,782      0,457    0,988
+        ---------------------------------------------------
+        kazanan                    1          2        3
+
+    Indirilmis alanlarda (is, kira) yerel daha iyi; hic indirilmemis
+    alanlarda (marka, patent) yerel fiilen sifir. Yani biri digerinin
+    yerine gecmiyor.
+
+    Yerel aramanin sorgu anindaki maliyeti sifira yakin (~0,3 sn, ag
+    yok, Gemini yok) ve canli zaten yapiliyor. Ikisini de bakip iyisini
+    secmek, canliyi tek basina kullanmaya gore hicbir sey kaybettirmez.
+    """
+    if guven_dusuk:                       # soru kulliyatla ilgisiz
+        return [], "yerel"
+
+    # YEREL ONCE. Yerel arama ag istegi yapmiyor ve saniyenin altinda
+    # bitiyor; canli cekim 10-30 saniye ekliyor. Her soruda aga cikmak
+    # cevabi 90 saniye-2 dakikaya cikariyordu ve Cloudflare tuneli
+    # 100 saniyede "524" ile istegi kesiyordu.
+    yerel_sonuc: list[dict] = []
+    if k.get("karar") is not None:
+        try:
+            yerel_sonuc = k["karar"].ara(soru, limit=KARAR_ADEDI)
+        except Exception as exc:          # yerel taraf cevabi engellememeli
+            log.warning("yerel karar aramasi basarisiz: %s", str(exc)[:80])
+
+    # Canliya yalnizca yerel ZAYIF kaldiginda cikiyoruz. Kapsam yine
+    # sinirsiz: kullanici "Daha fazla karar getir" dugmesiyle her zaman
+    # canliya erisebiliyor (/api/kararlar), ama bunun bedelini yalnizca
+    # isteyen odemis oluyor.
+    canli_sonuc: list[dict] = []
+    if len(yerel_sonuc) < CANLI_YEDEK_SINIRI:
+        canli_sonuc, _ = _canli_once(k, soru, guven_dusuk)
+
+    return _kararlari_birlestir(yerel_sonuc, canli_sonuc)
+
+
+def _karar_tarihi(k: dict) -> tuple:
+    """gg.aa.yyyy -> siralanabilir demet. Tarih yoksa en eskiye koyar."""
+    parcalar = (k.get("karar_tarihi") or "").split(".")
+    if len(parcalar) != 3:
+        return (0, 0, 0)
+    try:
+        g, a, y = (int(x) for x in parcalar)
+        return (y, a, g)
+    except ValueError:
+        return (0, 0, 0)
+
+
+def _kararlari_birlestir(yerel: list[dict], canli: list[dict],
+                         limit: int = KARAR_ADEDI) -> tuple[list[dict], str]:
+    """Iki havuzu BIRLESTIRIR; birini secmez.
+
+    ONCE BIRINI SECIYORDU ve bu yanlisti. Iki havuz en yuksek ce_skor'a
+    gore kiyaslaniyordu; olculdu, puanlar DOYUYOR:
+
+        "kiraci iki hakli ihtar nedeniyle tahliye edilebilir mi"
+        yerel  8 kararin 8'i de ce = 0,999
+        canli  8 kararin 6'si  ce = 0,999
+
+    Tavana vurmus iki sayiyi karsilastirmak yazi-tura demek. Ustelik
+    secim yapmak bilgi ATIYOR: kaybeden havuzdaki kararlar da alakali.
+
+    TARIH IKINCIL OLCUT. Alaka esitken YENI karar daha degerli: mevzuat
+    ve ictihat degisiyor. Kullanicinin sikayeti tam buydu -- "bula bula
+    2009 mu bulmus". (O ornekte eskilik kismen dogruydu: kira davalarina
+    bakan 6. Hukuk Dairesi 2016'da kapandi, gorevi 3. HD'ye gecti. Yine
+    de yeniyi one almak dogru sira.)
+    """
+    gorulen: set[str] = set()
+    hepsi: list[dict] = []
+    for k in list(yerel) + list(canli):
+        kimlik = (k.get("kisa_ad") or "").strip() or                  f"{k.get('esas_no', '')}|{k.get('karar_no', '')}"
+        if kimlik in gorulen:
+            continue
+        gorulen.add(kimlik)
+        hepsi.append(k)
+
+    hepsi.sort(key=lambda k: (round(k.get("ce_skor", 0.0), 3), _karar_tarihi(k)),
+               reverse=True)
+    kirpik = hepsi[:limit]
+    if not kirpik:
+        return [], "yerel"
+    canli_var = any(k.get("canli") for k in kirpik)
+    yerel_var = any(not k.get("canli") for k in kirpik)
+    kaynak = "karma" if (canli_var and yerel_var) else ("canli" if canli_var else "yerel")
+    return kirpik, kaynak
+
+
+def _kararlari_iyilestir(k: dict, soru: str, kararlar: list[dict],
+                         guven_dusuk: bool) -> tuple[list[dict], str]:
+    """Karar sonuclari zayifsa once YERELDE, sonra CANLI olarak duzeltir.
+
+    Uc kademeli merdiven. Sirasi onemli, cunku her kademe bir oncekinden
+    pahali:
+
+      1. ham soru + yerel indeks      0 ek maliyet
+      2. hukuki terim + yerel indeks  ~0,6 sn (bir Gemini cagrisi)
+      3. hukuki terim + canli Yargitay ~11 sn (ag)
+
+    Cogu soru 1. kademede bitiyor; merdiven yalnizca sonuc zayifken
+    tirmaniyor. Terime cevirme adimi kanun tarafinda (HyDE) zaten vardi,
+    karar tarafinda YOKTU -- asil hata buydu.
+
+    Doner: (kararlar, kaynak) -- kaynak arayuzde gosteriliyor.
+    """
+    if guven_dusuk:                   # soru kulliyatla ilgisiz
+        return kararlar, "yerel"
+
+    if _en_iyi_skor(kararlar) >= KARAR_SKOR_ESIGI:
+        return kararlar, "yerel"
+
+    canli = k.get("canli_karar")
+    if canli is None:
+        return kararlar, "yerel"
+
+    from core.canli_karar import arama_terimi
+    try:
+        terim = arama_terimi(soru, k["generator"])
+    except Exception as exc:
+        log.warning("arama terimi uretilemedi: %s", str(exc)[:80])
+        return kararlar, "yerel"
+    if not terim:
+        return kararlar, "yerel"
+
+    # 2. kademe: AYNI kulliyat, duzgun sorgu. Ag istegi yok.
+    if k.get("karar") is not None:
+        try:
+            terimle = k["karar"].ara(terim, limit=KARAR_ADEDI)
+            if _en_iyi_skor(terimle) > _en_iyi_skor(kararlar):
+                kararlar = terimle
+        except Exception as exc:
+            log.warning("terimle karar aramasi basarisiz: %s", str(exc)[:80])
+
+    if _en_iyi_skor(kararlar) >= KARAR_SKOR_ESIGI:
+        return kararlar, "yerel-terim"
+
+    # 3. kademe: kulliyatta gercekten yok; Yargitay'dan canli cek.
+    try:
+        ek = canli.ara(soru, limit=KARAR_ADEDI)
+    except Exception as exc:          # ag hatasi cevabi engellememeli
+        log.warning("canli karar cekimi basarisiz: %s", str(exc)[:120])
+        return kararlar, "yerel-terim"
+
+    if _en_iyi_skor(ek) > _en_iyi_skor(kararlar):
+        return ek, "canli"
+    return kararlar, "yerel-terim"
 
 
 # mevzuat.gov.tr'deki tur kodlari; payload'da tur adi saklaniyor
@@ -169,6 +431,63 @@ def durum():
 
 class Netlestirme(BaseModel):
     soru: str
+
+
+class DahaKarar(BaseModel):
+    soru: str
+    adet: int = 12
+    haric: list[str] = []          # zaten gosterilenler
+
+
+@app.post("/api/kararlar")
+def daha_karar(istek: DahaKarar):
+    """Ayni soru icin DAHA COK karar getirir.
+
+    NEDEN AYRI UC
+    Cevap uretimi pahali (Gemini + vurgu + karsi taraf); yalnizca daha
+    cok emsal gormek icin butun akisi tekrar calistirmak gereksiz.
+    Burada yalnizca karar arama yapiliyor.
+
+    Varsayilan gosterim alti karar. Avukat emsal ararken bu az kalabilir
+    -- ozellikle hepsi ayni daireden ve yakin tarihliyse -- ama her
+    soruda otuz karar cekmek hem yavas hem Yargitay'a yuk. Bu yuzden
+    "daha fazla" istege bagli.
+    """
+    k = kaynaklar()
+    n = max(1, min(int(istek.adet or 12), 30))
+    haric = {x for x in (istek.haric or []) if x}
+
+    yerel: list[dict] = []
+    if k.get("karar") is not None:
+        try:
+            yerel = k["karar"].ara(istek.soru, limit=n)
+        except Exception as exc:
+            log.warning("yerel karar aramasi basarisiz: %s", str(exc)[:80])
+
+    canli: list[dict] = []
+    if k.get("canli_karar") is not None:
+        try:
+            canli = k["canli_karar"].ara(istek.soru, limit=n)
+        except Exception as exc:      # ag hatasi bos liste dondursun
+            log.warning("canli karar cekimi basarisiz: %s", str(exc)[:120])
+
+    kararlar, kaynak = _kararlari_birlestir(yerel, canli, limit=n + len(haric))
+    kararlar = [x for x in kararlar
+                if (x.get("kisa_ad") or "") not in haric][:n]
+    return {
+        "kaynak": kaynak,
+        "kararlar": [{
+            "kisa_ad": kr.get("kisa_ad", ""),
+            "daire": kr.get("daire", ""),
+            "esas_no": kr.get("esas_no", ""),
+            "karar_no": kr.get("karar_no", ""),
+            "karar_tarihi": kr.get("karar_tarihi", ""),
+            "metin": kr.get("gerekce") or kr.get("metin", ""),
+            "skor": round(kr.get("skor", 0), 4),
+            "ce_skor": round(kr.get("ce_skor", 0), 4),
+            "canli": bool(kr.get("canli")),
+        } for kr in kararlar],
+    }
 
 
 @app.post("/api/netlestir")
@@ -351,12 +670,17 @@ def sor(istek: Soru):
     vektor_puani = getattr(k["retriever"], "son_vektor_puani", 0.0)
     guven_dusuk = vektor_puani < config.GUVEN_ESIGI
 
-    kararlar = []
-    if k.get("karar") is not None:
-        try:
-            kararlar = k["karar"].ara(istek.soru, limit=3)
-        except Exception as exc:      # karar tarafi cevabi engellememeli
-            log.warning("karar aramasi basarisiz: %s", exc)
+    kararlar, karar_kaynagi = [], "yerel"
+    if config.CANLI_ONCE:
+        kararlar, karar_kaynagi = _en_iyi_kararlar(k, istek.soru, guven_dusuk)
+    else:
+        if k.get("karar") is not None:
+            try:
+                kararlar = k["karar"].ara(istek.soru, limit=KARAR_ADEDI)
+            except Exception as exc:  # karar tarafi cevabi engellememeli
+                log.warning("karar aramasi basarisiz: %s", exc)
+        kararlar, karar_kaynagi = _kararlari_iyilestir(
+            k, istek.soru, kararlar, guven_dusuk)
 
     # Karsi tarafin dayanabilecegi maddeler. Tavsiye degil, yalnizca
     # "bunlara da bak" listesi -- cikarim kullanicinin.
@@ -444,9 +768,20 @@ def sor(istek: Soru):
             "esas_no": kr.get("esas_no", ""),
             "karar_no": kr.get("karar_no", ""),
             "karar_tarihi": kr.get("karar_tarihi", ""),
-            "metin": kr.get("gerekce", ""),
+            # Yerel kararlarda ayristirilmis "gerekce", canli cekilende
+            # ham "metin" var. Yalnizca gerekce'ye bakmak canli kararin
+            # govdesini BOS gosteriyordu.
+            "metin": kr.get("gerekce") or kr.get("metin", ""),
             "skor": round(kr.get("skor", 0), 4),
+            # Havuzdan bagimsiz mutlak alaka puani; iki kaynagi
+            # kiyaslamanin tek gecerli olcusu.
+            "ce_skor": round(kr.get("ce_skor", 0), 4),
+            "canli": bool(kr.get("canli")),
         } for kr in kararlar],
+        # Kararlarin nereden geldigi: "yerel" | "yerel-terim" | "canli".
+        # Avukat kaynagi bilmeli; canli kararlar henuz indekse girmemis
+        # olabilir ve bir daha ayni siralamada gelmeyebilir.
+        "karar_kaynagi": karar_kaynagi,
     }
 
 

@@ -389,6 +389,59 @@ def cmd_ictihat(args) -> None:
 
     kaydet()
     log.info("toplam %d benzersiz karar -> %s", len(hepsi), KARAR_YOLU)
+    # Kayip ozeti: tek tek WARNING satirlari binlerce satirda kayboluyor.
+    log.info("CEKIM OZETI: %s", istemci.ozet())
+
+
+def cmd_canli_devral(args) -> None:
+    """Canli cekilen kararlari asil kulliyata katar.
+
+    Canli cekim istek aninda calisiyor ve geleni ayri bir dosyada
+    biriktiriyor -- istek icinde 48 MB'lik kararlar.json'u yeniden yazmak
+    hem yavas hem riskli (bu dosya daha once tam boyle bir yazmada yarim
+    kalmisti). Bu komut birikimi asil dosyaya tasiyor; ardindan
+    "karar-indeksle" ile aranabilir hale geliyor.
+
+    Bu, kulliyatin GERCEK SORULARDAN buyudugu yer: 55 anahtari bir insan
+    yazmisti, buraya duseni kullanicilar belirliyor.
+    """
+    from core.canli_karar import CANLI_BIRIKIM
+
+    if not CANLI_BIRIKIM.exists():
+        log.info("canli birikim yok, yapilacak bir sey yok")
+        return
+    gelen = json.loads(CANLI_BIRIKIM.read_text(encoding="utf-8"))
+    log.info("%d canli karar birikmis", len(gelen))
+
+    hepsi = {}
+    if KARAR_YOLU.exists():
+        for k in json.loads(KARAR_YOLU.read_text(encoding="utf-8")):
+            hepsi[k["id"]] = k
+
+    eklenen = 0
+    for g in gelen:
+        kid = g.get("karar_id", "")
+        if not kid or kid in hepsi:
+            continue
+        hepsi[kid] = {
+            "id": kid,
+            "daire": g.get("daire", ""),
+            "esas_no": g.get("esas_no", ""),
+            "karar_no": g.get("karar_no", ""),
+            "karar_tarihi": g.get("karar_tarihi", ""),
+            "durum": "",
+            "metin": g.get("metin", ""),
+            "anahtar": g.get("arama_terimi", "canli"),
+            "kisa_ad": g.get("kisa_ad", ""),
+            "chunk_id": f"karar-{kid}",
+        }
+        eklenen += 1
+
+    guvenli_yaz(KARAR_YOLU, list(hepsi.values()))
+    log.info("%d yeni karar devralindi, toplam %d -> %s",
+             eklenen, len(hepsi), KARAR_YOLU)
+    if eklenen:
+        log.info("aranabilir olmasi icin: python cli.py karar-indeksle")
 
 
 def cmd_karar_indeksle(args) -> None:
@@ -683,6 +736,10 @@ def main() -> None:
 
     ki = alt.add_parser("karar-indeksle", help="kararlari ayri indekse yaz")
     ki.set_defaults(func=cmd_karar_indeksle)
+
+    cd_ = alt.add_parser("canli-devral",
+                         help="canli cekilen kararlari kulliyata kat")
+    cd_.set_defaults(func=cmd_canli_devral)
 
     dn = alt.add_parser("danistay", help="Danistay kararlarini indir")
     dn.add_argument("--anahtar", nargs="+", default=IDARI_ANAHTARLAR)

@@ -22,6 +22,45 @@ arama terimi demek ve BM25 275 bin belgeyi o kadar terimle tariyor;
 olculdu, arama 3,8 saniyeden 10,7 saniyeye cikiyor) hem de gurultu
 ekleyip isabeti dusuruyor. Tek cumle hem daha hizli hem daha isabetli.
 
+KONUYU DUSURME TUZAGI
+Uretilen metin hukmun MEKANIZMASINI yaziyor ama sorunun KONUSUNU
+dusurebiliyor. Olculdu:
+
+    soru   "uyusturucu madde ticareti sucunda etkin pismanlik cezayi
+            ne kadar indirir"
+    uretilen  "Suc resmi makamlarca ogrenilmeden once bilgi verenlerin
+               cezasi yari oraninda ..."   <- "uyusturucu" YOK
+
+TCK'da "Etkin pismanlik" baslikli 11 madde var (m.93, 110, 168, 192,
+201, 221, 248, 254, 269, 274, 293). Ayirt edici kelime dusunce hepsi
+birbirinin ayni gorunuyor: dogru madde (m.192) ilk 8'e bile girmedi ve
+sistem "dayanak bulamadim" dedi -- oysa madde kulliyatta duruyordu.
+
+Ilk cozum denemesi "HyDE metni + ham soru" ile aramakti; uyusturucu
+sorusunu duzeltiyor ama OLCUM SETINDE geriletiyordu:
+
+    yalniz HyDE    MRR 0,977   1. sirada 31/32
+    HyDE + soru    MRR 0,958   1. sirada 30/32
+
+IKI COZUM DENENDI, IKISI DE GERILETTI -- HICBIRI ALINMADI:
+
+    yalniz HyDE (mevcut)      MRR 0,977   1. sirada 31/32
+    HyDE metni + ham soru     MRR 0,958   1. sirada 30/32
+    istemde "konuyu koru"     MRR 0,853   1. sirada 26/34
+
+Ikincisi ozellikle ogretici: isteme "sorunun konusunu belirten somut
+kelimeleri mutlaka kullan" kurali eklenince uretilen metin soruya
+benzemeye basliyor, yani HyDE HyDE olmaktan cikiyor. HyDE'nin butun
+degeri soruyu KANUN DILINE cevirmesinde; ham sorgu zaten 0,734.
+Sekiz soru birinci siradan dustu, biri ("haftalik calisma suresi kac
+saattir" -> 4857 m.63) ilk 20'ye bile giremedi.
+
+BILINEN SINIR OLARAK DURUYOR. Ayni basligi tasiyan cok sayida madde
+olan ve konusu hukum metninde gecmeyen sorularda dogru madde
+kaybolabiliyor. Bir sonraki deneme yama degil FUZYON olmali: HyDE ve
+ham soru ile IKI AYRI arama yapip sonuclari RRF ile birlestirmek --
+metinleri birlestirmek degil. Olculmeden alinmamali.
+
 SINIRI
 Uretilen metin UYDURMA bir hukumdur ve kullaniciya ASLA gosterilmez;
 yalnizca arama sorgusu olarak kullanilir. Cevap yine kulliyattan gelen

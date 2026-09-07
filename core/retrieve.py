@@ -556,6 +556,22 @@ class Retriever:
             ekle(self.store.search(cv, limit=aday, mulga_haric=mulga_haric),
                  agirlik=config.CEKIRDEK_AGIRLIK, kaynak="cekirdek")
 
+        # 2c) HAM SORU ayri bir sinyal. HyDE devredeyse "soru" uydurma
+        # hukum metnidir ve sorunun konusunu dusurmus olabilir; ham soru
+        # o kelimeleri geri getiriyor. Metinleri BIRLESTIRMIYORUZ (o
+        # denendi, seti geriletti) -- iki ayri siralamayi RRF birlestiriyor.
+        ham = (dogrudan_soru or "").strip()
+        if config.HYDE_HAM_AGIRLIK > 0 and ham and ham != soru:
+            hv = self.embedder.encode_query(ham)
+            ekle(self.store.search(hv, limit=aday, mulga_haric=mulga_haric),
+                 agirlik=config.HYDE_HAM_AGIRLIK, kaynak="ham_vektor")
+            if (b := self.bm25) is not None:
+                hs = b.get_scores(self._tokenize(ham))
+                en_iyi_h = sorted(range(len(hs)), key=lambda i: hs[i],
+                                  reverse=True)[:aday]
+                ekle([self._bm25_kayitlar[i] for i in en_iyi_h],
+                     agirlik=config.HYDE_HAM_AGIRLIK, kaynak="ham_bm25")
+
         # 3) Anahtar kelime
         if (bm25 := self.bm25) is not None:
             skorlar = bm25.get_scores(self._tokenize(soru))

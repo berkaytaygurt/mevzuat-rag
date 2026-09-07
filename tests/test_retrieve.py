@@ -74,3 +74,30 @@ def test_kisaltmalar_dogru_kanuna_isaret_eder():
     assert KISALTMALAR["tbk"] == "6098"
     assert KISALTMALAR["tmk"] == "4721"
     assert KISALTMALAR["kvkk"] == "6698"
+
+
+# --------------------------------------------------------------------
+# HyDE + ham soru fuzyonu
+# --------------------------------------------------------------------
+def test_hyde_ham_fuzyonu_acik():
+    """HyDE uretilen metin sorunun KONUSUNU dusurebiliyor.
+
+    "uyusturucu madde ticareti sucunda etkin pismanlik" sorusunda
+    uretilen hukumde "uyusturucu" gecmiyordu; TCK'da "Etkin pismanlik"
+    baslikli 11 madde var ve dogrusu (m.192) ilk 20'ye bile girmiyordu --
+    sistem "dayanak bulamadim" diyordu.
+
+    Cozum ham soruyu AYRI BIR SINYAL olarak RRF'e katmak. Olculdu:
+
+        agirlik 0,0   MRR 0,951   ilk20 33/34   m.192 bulunamadi
+        agirlik 1,0   MRR 0,931   ilk20 34/34   m.192 1. sirada
+
+    MRR dusuyor ama hicbir soru kaybolmuyor. Cevabi ureten model ilk 10
+    maddeyi gordugu icin siradan cok VARLIK onemli.
+
+    Daha once denenen ve GERILETTIGI ICIN ALINMAYAN iki yol:
+    metinleri birlestirmek ve isteme "konuyu koru" kurali eklemek.
+    """
+    import config
+
+    assert config.HYDE_HAM_AGIRLIK > 0, "fuzyon kapatilmis"

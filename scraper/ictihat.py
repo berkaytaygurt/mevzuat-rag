@@ -72,6 +72,12 @@ class KararKaydi:
 
 class EmsalClient:
     def __init__(self, delay: float = 2.0, cache_dir: Path | None = None):
+        # Sessiz kayip sayaci. Neden var: 1.253 belge "alinamadi" diye
+        # dustu ve bu YALNIZCA satir satir WARNING olarak gorunuyordu;
+        # sebep (429) ise log.debug'daydi, yani hic goze carpmiyordu.
+        # Toplam ozet olmadan %17'lik kayip fark edilmiyor.
+        self.sayac = {"belge_ok": 0, "belge_hata": 0, "hiz_siniri": 0,
+                      "arama_hata": 0}
         self.delay = delay
         self.cache_dir = cache_dir or (config.RAW_DIR / "karar_cache")
         self.cache_dir.mkdir(parents=True, exist_ok=True)
@@ -121,12 +127,22 @@ class EmsalClient:
             log.debug("arama baslatilamadi (%s): %s", kelime, exc)
 
     def _istek_dene(self, url: str, govde: dict, etiket: str,
-                    deneme: int = 4) -> dict | None:
+                    deneme: int = 7) -> dict | None:
         """Arama istegini tekrar deneyerek yapar.
 
         Sunucu ayni gövdeye bazen sonuc, bazen "ADALET_RUNTIME_EXCEPTION"
         donduruyor; hata parametreye degil ana bagli. Tek denemede vazgecmek
         sayfalarin rastgele bosalmasina yol aciyordu.
+
+        DENEME SAYISI 4'TEN 7'YE CIKARILDI. 55 anahtarlik cekimde biten
+        49 anahtarin 16'si (%33) "4 denemede sonuc vermedi" ile BOS
+        dondu -- o anahtardan hic karar gelmedi. Ucu elle yeniden
+        denendi, ucu de ANINDA sonuc verdi (1,1 milyon / 388 bin / 485
+        bin kayit). Yani hata kalici degil, anlik. Dogrusal bekleme ile
+        4 deneme ~15 saniye ediyordu; sitenin toparlanmasi icin kisa.
+        Ustel ve ust sinirli bekleme (2,5/5/10/20/30/30 sn) toplami
+        ~100 saniyeye cikariyor. Bir anahtarin 60 kararini tumden
+        kaybetmektense beklenir.
         """
         for i in range(deneme):
             self._bekle()
@@ -139,7 +155,9 @@ class EmsalClient:
             except (requests.RequestException, ValueError) as exc:
                 log.debug("istek hatasi (%s): %s", etiket, exc)
             if i < deneme - 1:
-                time.sleep(self.delay * (i + 1))
+                # Ustel, ust sinirli: dogrusal artis yeterince beklemiyordu.
+                time.sleep(min(self.delay * (2 ** i), 30.0))
+        self.sayac["arama_hata"] += 1
         log.warning("arama %d denemede sonuc vermedi: %s", deneme, etiket)
         return None
 
@@ -187,28 +205,83 @@ class EmsalClient:
         ad = hashlib.sha1(karar_id.encode()).hexdigest()[:16]
         return self.cache_dir / f"{ad}.json"
 
+    def ozet(self) -> str:
+        """Cekim sonunda TEK satirda ne kaybedildigini soyler.
+
+        Bu metot bir hatanin bedeliyle yazildi: 1.253 belge dustu ve
+        cekim "basarili" gorundu, cunku her kayip ayri bir WARNING
+        satiriydi ve binlerce satirlik logda kayboluyordu. Sebep (429
+        Too Many Requests) ise DEBUG duzeyindeydi, hic yazilmiyordu.
+        Bir daha sessizce olmasin diye toplamlar burada.
+        """
+        s = self.sayac
+        toplam = s["belge_ok"] + s["belge_hata"]
+        oran = (100.0 * s["belge_hata"] / toplam) if toplam else 0.0
+        parcalar = [f"belge {s['belge_ok']}/{toplam} indi"]
+        if s["belge_hata"]:
+            parcalar.append(f"DUSEN {s['belge_hata']} (%{oran:.1f})")
+        if s["hiz_siniri"]:
+            parcalar.append(f"429 hiz siniri {s['hiz_siniri']} kez")
+        if s["arama_hata"]:
+            parcalar.append(f"arama basarisiz {s['arama_hata']}")
+        return " | ".join(parcalar)
+
+    # 429 gorunce beklenecek sure (saniye). Site Retry-After BASLIGI
+    # GONDERMIYOR -- olculdu, 429 cevabinda hicbir ipucu yok -- bu yuzden
+    # sure elle secildi. Kisa tutmanin bedeli agir: asagiya bak.
+    HIZ_SINIRI_BEKLEME = 45.0
+
     def belge(self, karar_id: str) -> str:
-        """Kararin tam metnini doner. Onbellekteyse ag istegi yapilmaz."""
+        """Kararin tam metnini doner. Onbellekteyse ag istegi yapilmaz.
+
+        NEDEN BU KADAR SABIRLI
+        55 anahtarlik cekimde 1.253 belge "alinamadi" diye dustu --
+        indirilenlerin yaklasik %17'si. Once belgelerin gercekten yok
+        oldugu sanildi. Degildi: elle bakildiginda sunucu
+
+            429 Client Error: Too Many Requests
+
+        donuyordu ve ayni belge tek basina istendiginde 2.569 karakterlik
+        metni sorunsuz veriyordu. Yani karar duruyor, biz cok hizli
+        soruyoruz. Eski hal 3 deneme + dogrusal bekleme = toplam 7,5
+        saniye idi; hiz siniri penceresi bundan uzun, dolayisiyla ucu de
+        ayni pencereye dusuyor ve karar SESSIZCE kayboluyordu.
+
+        Simdi 429 ayri ele aliniyor: normal hatadan cok daha uzun
+        bekleniyor, cunku 429 "istek bozuk" degil "yavasla" demek.
+        """
         onbellek = self._cache_yolu(karar_id)
         if onbellek.exists():
             return json.loads(onbellek.read_text(encoding="utf-8")).get("metin", "")
 
         ham = ""
-        for i in range(3):
+        deneme = 6
+        for i in range(deneme):
             self._bekle()
+            hiz_siniri = False
             try:
                 r = self.session.get(BELGE_UCU, params={"id": karar_id}, timeout=60)
+                hiz_siniri = r.status_code == 429
+                if hiz_siniri:
+                    self.sayac["hiz_siniri"] += 1
                 r.raise_for_status()
                 ham = (r.json() or {}).get("data") or ""
                 if ham:
                     break
             except (requests.RequestException, ValueError) as exc:
                 log.debug("belge hatasi (%s): %s", karar_id, exc)
-            if i < 2:
-                time.sleep(self.delay * (i + 1))
+            if i < deneme - 1:
+                if hiz_siniri:
+                    # Pencerenin kapanmasini bekle; ustel artirmak yerine
+                    # sabit ve uzun, cunku sorun hiz -- kararsizlik degil.
+                    time.sleep(self.HIZ_SINIRI_BEKLEME)
+                else:
+                    time.sleep(min(self.delay * (2 ** i), 30.0))
         if not ham:
+            self.sayac["belge_hata"] += 1
             log.warning("belge alinamadi: %s", karar_id)
             return ""
+        self.sayac["belge_ok"] += 1
 
         metin = _html_metne(ham)
         onbellek.write_text(json.dumps({"id": karar_id, "metin": metin},

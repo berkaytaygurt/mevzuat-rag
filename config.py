@@ -141,6 +141,18 @@ CEKIRDEK_AGIRLIK = float(os.getenv("CEKIRDEK_AGIRLIK", "1.0"))
 # surec yeniden baslasa da gunluk toplam korunuyor.
 GEMINI_GUNLUK_SINIR = int(os.getenv("GEMINI_GUNLUK_SINIR", "1500"))
 
+# Gunluk SERT MALIYET tavani (ABD dolari). Istek sayisi tek basina
+# koruma saglamiyor: bir cagrinin maliyeti 100 kat degisiyor.
+#     terim cikarma       ~200 token
+#     cevap uretme        ~20.000 token (10 madde metni istemde)
+# Yani 1500 isteklik tavan, isin cinsine gore 5 TL de olabilir 300 TL de.
+# OLCULDU: 1-2 Eylul'de 102 test sorusu tam boru hattindan gecirildi ve
+# tek gunde faturanin buyuk kismi orada olustu; sayac 1500'e hic
+# yaklasmamisti, yani tavan hic devreye girmedi. Normal site kullanimi
+# gunde ~2 TL (92 istek), bu yuzden 1 dolarlik tavan gundelik kullanimi
+# hic etkilemiyor ama kacan bir toplu isi durduruyor.
+GEMINI_GUNLUK_USD = float(os.getenv("GEMINI_GUNLUK_USD", "1.00"))
+
 # Genisletme uyarlamali calisir: yalnizca ilk arama zayif sonuc verdiginde
 # tetiklenir. Olculdu -- 448 sorgunun yalnizca 28'inde (%6) devreye girdi,
 # yani fikir test bile edilmemis oldu. Bu bayrak esigi atlayip her sorguda
@@ -249,3 +261,60 @@ COCUK_ARAMA = os.getenv("COCUK_ARAMA", "0") not in ("0", "false", "hayir")
 #
 # Madde atifli sorgularda ("TBK 344") devreye girmez.
 HYDE = os.getenv("HYDE", "1") not in ("0", "false", "hayir")
+
+# HyDE aciktayken HAM SORUYU da ayri bir sinyal olarak RRF'e katma
+# agirligi. 0 = katma (yalnizca HyDE metniyle ara).
+#
+# NEDEN: HyDE uretilen metin hukmun mekanizmasini yaziyor ama sorunun
+# KONUSUNU dusurebiliyor. "uyusturucu madde ticareti sucunda etkin
+# pismanlik" sorusunda uretilen metinde "uyusturucu" gecmiyor; TCK'da
+# "Etkin pismanlik" baslikli 11 madde var ve dogru olan (m.192) ilk
+# 8'e bile girmiyordu.
+#
+# Iki BASARISIZ deneme once yapildi (core/hyde.py'de yazili): metinleri
+# birlestirmek ve isteme "konuyu koru" kurali eklemek. Bu ucuncu yol
+# farkli: metinler degil SIRALAMALAR birlestiriliyor, yani HyDE'nin
+# sorgusu bozulmuyor.
+#
+# OLCULDU (34 soruluk set, ayni HyDE metinleriyle uc agirlik):
+#
+#     agirlik   MRR     1. sirada   ilk 20'de   TCK m.192
+#        0,0    0,951     32/34       33/34     bulunamadi
+#        0,5    0,927     30/34       34/34     2. sirada
+#        1,0    0,931     30/34       34/34     1. sirada
+#
+# BU BIR TAKAS, KAYIP DEGIL -- ve dogru olcu MRR degil.
+# Cevabi ureten model ilk 10 maddeyi goruyor; dogru maddenin 1. mi 2. mi
+# oldugu cevabi neredeyse hic degistirmiyor, LISTEDE OLUP OLMADIGI her
+# seyi degistiriyor. Fuzyon iki soruyu birinci siradan dusuruyor ama
+# hicbir soruyu kaybetmiyor (33/34 -> 34/34) ve HyDE'nin konuyu
+# dusurdugu sinifi kurtariyor: m.192 sorusunda sistem "dayanak
+# bulamadim" diyordu, simdi dogru maddeyi birinci sirada veriyor.
+HYDE_HAM_AGIRLIK = float(os.getenv("HYDE_HAM_AGIRLIK", "1.0"))
+
+# Yerel kulliyatta karar bulunamadiginda Yargitay'dan CANLI cekilsin mi.
+# Onceden indirilen kararlar elle secilmis 55 anahtar kelimeyle
+# sinirliydi; listede olmayan konuda karar bolumu bos geliyordu. Canli
+# cekim olculdu: arama 0,6 sn + 5 belge 3,9 sn = 4,5 sn, 429 cikmadi.
+# Cevaba ~5 saniye ekliyor, bu yuzden YALNIZCA yerel sonuc zayifken
+# devreye giriyor. Kapatmak icin CANLI_KARAR=0.
+CANLI_KARAR = os.getenv("CANLI_KARAR", "1") not in ("0", "false", "hayir")
+
+# Kararlarda CANLI katman ana katman mi, yedek mi.
+#
+# "1" (varsayilan, kullanicinin karari): her soruda once Yargitay'a
+# canli cikilir; yerel kulliyat yalnizca canli basarisiz oldugunda ya da
+# daha kotu sonuc verdiginde devreye girer. Gerekce: onceden indirilen
+# kulliyat elle yazilmis anahtar listesiyle sinirliydi ve nadir konuyu
+# hicbir zaman kapsayamaz -- Yargitay'da milyonlarca karar var.
+#
+# "0": yerel once, canli yedek (eski davranis). Daha hizli ve
+# Yargitay'in erisilebilirligine bagimli degil, ama kapsama elle
+# secilmis konularla sinirli.
+#
+# BEDELI OLCULDU: canli katman soru basina +5-11 saniye ekliyor ve
+# Yargitay 429 (Too Many Requests) donebiliyor -- bugun tek istemcili
+# bir cekimde 1.253 belge (%17) bu yuzden dusmustu. Yerel katmanin
+# YEDEK olarak durmasi bu yuzden onemli: Yargitay cekilirse sistem
+# kararsiz kalmiyor, elindekiyle cevap veriyor.
+CANLI_ONCE = os.getenv("CANLI_ONCE", "1") not in ("0", "false", "hayir")

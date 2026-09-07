@@ -1,212 +1,276 @@
 # Aibars
 
-*Türk mevzuatında soru sorabildiğiniz bir arama sistemi.
-Bu belge ne yapmaya çalıştığımızı, ne bulduğumuzu ve neyin işe yarayıp
-yaramadığını anlatır.*
+Türk mevzuatı ve içtihadı üzerinde çalışan bir hukuk arama asistanı.
+Avukat kendi diliyle bir soru yazar; sistem ilgili kanun maddelerini,
+karşı tarafın dayanabileceği maddeleri ve Yargıtay kararlarını
+kaynağıyla birlikte getirir.
+
+Bu belge sistemin **son halini** anlatır: veri nereden geliyor, arama
+nasıl çalışıyor, sitede ne var.
 
 ---
 
-## Çözmeye çalıştığımız şey
+## 1. Bir soru sorulduğunda ne oluyor
 
-Bir avukatın "kıdem tazminatı için ne kadar çalışmak gerekir" sorusunun
-cevabını bulması gerektiğinde iki yolu var.
+```
+         avukat bir soru yazar
+                  |
+                  v
+    +------------------------------+
+    | 1. Soru kanun diline çevrilir|   HyDE - soruyu cevaplayacak
+    |                              |   varsayımsal bir hüküm yazılır,
+    |                              |   arama onunla yapılır
+    +------------------------------+
+                  |
+                  v
+    +------------------------------+
+    | 2. Dört ayrı sinyalle aranır |   - madde numarası ("TBK 344")
+    |    ve sonuçlar birleştirilir |   - anlam (vektör)
+    |                              |   - kelime (BM25)
+    |                              |   - ham sorunun kendisi
+    +------------------------------+
+                  |
+                  v
+    +------------------------------+
+    | 3. En iyi 50 aday yeniden    |   cross-encoder her adayı
+    |    sıralanır                 |   soruyla tek tek karşılaştırır
+    +------------------------------+
+                  |
+     +------------+------------+--------------+
+     v            v            v              v
+  cevap       dayanak      karşı taraf     kararlar
+  üretilir    maddeler     maddeleri       (yerel + canlı)
+```
 
-**Birincisi mevzuat.gov.tr.** Devletin sitesi, ücretsiz ve eksiksiz. Ama
-kelime araması yapıyor. "Kıdem tazminatı" yazarsınız, yüzlerce sonuç gelir,
-hangisinin işinize yaradığını tek tek bakarak bulursunuz.
-
-**İkincisi bir yapay zekâya sormak.** Cevabı hemen verir. Ama iki sorun var:
-kaynağını gösteremez, ve bilmediği yerde uydurur — üstelik uydurduğunu belli
-etmez, aynı kendinden emin tonla söyler.
-
-Aibars bu ikisinin arasını doldurmayı deniyor: soruyu doğal dille sorun,
-cevabı ilgili kanun maddesinin **tam metniyle birlikte** alın.
-
----
-
-## Nasıl çalışıyor
-
-Bir soru yazdığınızda üç şey oluyor.
-
-**Önce arama.** Sistem 275 bin madde içinde sorunuza en yakın olanları
-buluyor. Kelime eşleştirmiyor, anlam eşleştiriyor — "işten atıldım param ne
-olur" ile kıdem tazminatı maddesini bir araya getirebiliyor.
-
-**Sonra okuma.** Bulunan 10 maddenin tam metni bir yapay zekâ modeline
-veriliyor ve şu deniyor: *yalnızca bunlara dayanarak cevapla.* Model kendi
-hafızasından konuşmuyor; önüne konan metni okuyup açıklıyor.
-
-**Sonra gösterme.** Cevabın altında dayanak maddeler tam metinleriyle
-listeleniyor, her birinin yanında mevzuat.gov.tr bağlantısı var. İsterseniz
-açıp okuyorsunuz.
-
-Bu yöntemin adı RAG. Alternatifi modeli mevzuatla eğitmekti, ama o yanlış
-olurdu: kanunlar değişir, her değişiklikte yeniden eğitim gerekir, ve
-eğitilmiş model yine kaynak gösteremez.
+Ortalama süre **6-19 saniye**.
 
 ---
 
-## Elimizde ne var
+## 2. Veri nereden geliyor
 
-**~275.000 madde.** ~11.850 belge — kanunlar, tüzükler, yönetmelikler,
-tebliğler. Kağıda dökülse yaklaşık 99.600 sayfa.
+### Mevzuat — indirildi, diskte
 
-Katalog eksiği (belge adreslerinin türden türe değişmesi ve listenin yarıda
-kesilmesi) sonradan bulunup düzeltildi; ayrıntı için README'deki "Külliyat
-eksikleri" bölümü. Kanun hükmünde kararnameler siteden hiç sunulmuyor.
+`mevzuat.gov.tr` üzerinden çekildi ve maddelere ayrıştırıldı.
 
-**~30.800 mahkeme kararı.** ~30.400'ü Yargıtay (9., 22. ve 7. Hukuk Daireleri
-— iş hukuku), ~400'ü Danıştay (memur, disiplin, atama, mobbing gibi idari
-uyuşmazlıklar). Kararlar maddelerden ayrı tutuluyor ve cevapta ayrı bir bölüm
-olarak gösteriliyor. Sebebi basit: karar bağlayıcı kural değil, kuralın bir
-olayda nasıl uygulandığının örneği. İkisi karışmamalı.
-
----
-
-## Asıl soru: buna gerek var mı
-
-Doğrudan bir yapay zekâya sorsak ne kaybederiz? Bunu tahmin etmek yerine
-ölçtük. İki test yapıldı.
-
-### Birinci test: iş hukuku
-
-Bir avukatın pratikte sorduğu 52 soru elle yazıldı — kıdem tazminatı, işe
-iade, fazla mesai, yıllık izin gibi. Aynı sorular hem Aibars'a hem doğrudan
-Gemini'ye soruldu.
-
-**Sonuç: fark yok.** İkisi de benzer isabetle cevapladı.
-
-Bunun sebebi anlaşılır. İş Kanunu internette binlerce kez yazılmış,
-tartışılmış, örneklenmiş. Yapay zekâ onu zaten biliyor. 275 bin maddelik bir
-külliyat kurmanın orada bir katkısı yok.
-
-### İkinci test: kimsenin bilmediği mevzuat
-
-Asıl fark burada olmalıydı. Tebliğ ve kurum yönetmeliklerinden 50 soru
-seçildi — bir üniversitenin devam zorunluluğu oranı, bir odanın genel kurul
-süresi, bir tebliğdeki hesaplama oranı gibi. Cevabı hep somut bir sayı.
-
-| | Doğru cevap |
+| Tür | Adet |
 |---|---|
-| Doğrudan Gemini | %57 |
-| **Aibars** | **%91** |
+| Kanun | 916 |
+| Kurum ve Kuruluş Yönetmeliği | 5.049 |
+| Tebliğ | 4.471 |
+| Cumhurbaşkanlığı Yönetmeliği | 3.655 |
+| Yönetmelik | 178 |
+| Cumhurbaşkanlığı Kararnamesi | 107 |
+| Tüzük | 63 |
+| **Katalog toplamı** | **14.439** |
 
-Gemini'nin yanlışları uydurmaydı: doğrusu 3 iken 4 dedi, doğrusu 17 iken 9
-dedi, doğrusu 50 iken "%40 ve %60" dedi. Hiçbirinde tereddüt etmedi.
+Bunlardan **275.192 madde** çıkarıldı ve vektörlendi. Kanunların
+%99,3'ü tam — eksik 6 tanesi 1920'lerden kalma nizamnameler.
+Yönetmelik ve tüzükler %100.
 
-Aynı soruların ilk 10'u Claude'a da soruldu; o da **2/10** yaptı.
+**Neden indirildi:** Kanun sayısı belli ve sonlu. Ayrıca
+mevzuat.gov.tr'de anlam araması yok; site birebir metin eşleştirir,
+"kiracımı nasıl çıkarırım" yazınca hiçbir şey bulmaz. Maddeye bölmek,
+mülga olanları ayıklamak ve atıfları çıkarmak da ancak tüm metin
+elimizdeyken mümkün.
 
-### Bundan çıkan sonuç
+### İçtihat — çoğu canlı, internetten
 
-Değer, yapay zekânın daha akıllı olmasında değil. Cevabı yine aynı model
-yazıyor. Fark şu: **doğru metni bulup onun önüne koyuyoruz.**
-
-Bilinen kanunlarda bunun anlamı yok, model zaten biliyor. Bilinmeyen
-mevzuatta anlamı büyük, çünkü orada model tahmin ediyor.
-
-Kısacası: *bildiğiniz kanunları sormayın, bilmediklerinizi sorun.*
-
----
-
-## Sistemin zayıf yanı
-
-En büyük sorun şu: **soru ne kadar doğal yazılırsa isabet o kadar düşüyor.**
-
-Aynı bilgiyi soran üç sorgu:
-
-| Ne yazarsanız | Doğru madde kaçıncı sırada |
+| Kaynak | Durum |
 |---|---|
-| kıdem tazminatı şartları | 1. |
-| kıdem tazminatı | 8. |
-| kıdem tazminatına hak kazanmak için ne kadar çalışmak gerekir | 21. |
+| Yargıtay (canlı) | `karararama.yargitay.gov.tr` — sınırsız |
+| Yargıtay (yerel arşiv) | 7.566 karar / 30.828 parça |
+| Danıştay | 40 karar — CAPTCHA nedeniyle durduruldu |
 
-Üçü de aynı şeyi soruyor. Ama insanlar üçüncüsü gibi soruyor.
+**Neden indirilmedi:** Yargıtay'da milyonlarca karar var, indirmekle
+bitmez. Onun yerine soru sorulduğunda canlı aranıyor.
 
-Sebep: kanun metni hukuk diliyle yazılmış, kullanıcı gündelik dille soruyor.
-"Ne kadar", "gerekir mi", "nasıl" gibi kelimeler kanunda geçmiyor ve aramayı
-konudan uzaklaştırıyor.
+### Atıf grafiği — türetildi
 
-**Denenen çözüm:** soruyu aramadan önce yapay zekâya verip hukuk terimlerine
-çevirtmek.
+Kanun metinleri ayrıştırılarak **105.937 madde-madde bağlantısı**
+çıkarıldı; her birinin türü de belirlendi:
 
-> "işten çıkarıldım tazminat alabilir miyim"
-> → *kıdem tazminatı, ihbar tazminatı, iş sözleşmesinin feshi, iş güvencesi*
+```
+istisnası -> TBK m.138  III. Aşırı ifa güçlüğü
+   "Ancak, bu Kanunun, 'Aşırı ifa güçlüğü' başlıklı 138 inci
+    maddesi hükmü saklıdır."
+```
 
-Bu işe yarıyor: elle yazılmış sorularda isabet 0,71'den 0,84'e çıkıyor. Uzun
-süre kullanılamaz göründü çünkü 22 saniye sürüyordu. Sonra anlaşıldı ki sorun
-tasarımda değil, seçilen modelde — küçük bir model aynı işi 48 kat hızlı
-yapıyor. Şimdi 1,6 saniye.
-
-**Sonraki adım — HyDE:** sorguyu terimlere çevirmek yerine, sorunun cevabı
-olacak varsayımsal bir hüküm cümlesi ürettirip aramayı o cümleyle yapmak
-(soru ile kanun metnini aynı dile getiriyor). Ölçülen isabet MRR 0,73'ten
-0,919'a çıktı, 34 sorunun 32'si 1. sırada. Ayrıntı ve tuzaklar için
-README'deki "Güncel Ölçümler" bölümü ve `core/hyde.py`.
+Ayrıca **1.406 madde** için "bu maddeyi hangi kararlar yorumlamış"
+zinciri var.
 
 ---
 
-## Yol boyunca bulunanlar
+## 3. Sitede ne var
 
-Sistem kurulurken çıkan hataların ortak özelliği vardı: **hiçbiri hata mesajı
-vermiyordu.** Her şey çalışıyor görünüyordu.
+### Cevap
 
-- Türk Medeni Kanunu 1030 madde yerine 425 madde olarak indi. Sitenin verdiği
-  sayfa uzun kanunları sessizce kesiyordu; PDF'e geçilince düzeldi.
-- Aynı numarayı taşıyan farklı kanunlar birbirini eziyordu — 104 madde hiç
-  indekse girmemişti.
-- Yürürlükten kalktığı sanılan 54 maddenin 20'si aslında yürürlükteydi;
-  yalnızca bir fıkrası kaldırılmıştı.
-- 4.099 belge boş dosya olarak iniyordu. Belge adresi türden türe
-  değişiyormuş ve yanlış adres, hata yerine boş bir PDF döndürüyormuş.
-  Düzeltilince kapsam %30'dan %73'e çıktı — yeni bir çalışmayla değil, var
-  olanın neden alınamadığının bulunmasıyla.
-- Mahkeme kararlarının gerekçesi belirli bir ifadeyle bulunuyordu. 15 gerçek
-  kararda sayıldı: o ifade **hiçbirinde yoktu.** Kod sessizce metnin ikinci
-  yarısını alıyor ve gerekçenin başını kesiyordu.
+Soru ekranda kalır, altında cevap. Cevabın altındaki yeşil şerit
+**kaynak doğrulaması**: cevaptaki her madde numarası ve sayı, gerçek
+madde metniyle karşılaştırılır. Eşleşmezse cevap gösterilmez.
 
-Arama tarafında ölçülerek yapılan iyileştirmeler isabeti %35'ten %71'e
-çıkardı. En sağlam kazanç şuydu: sıralama modeli maddenin yalnızca ilk 768
-karakterini görüyordu, oysa külliyattaki 58.975 madde bundan uzun. Görülen
-metin iki katına çıkarıldı.
+Sistem külliyatta karşılık bulamazsa **uydurmaz**, "dayanak bulamadım"
+der.
 
----
+### Dört sekme
 
-## Dürüst değerlendirme
-
-**Kanıtlanan:** bilinmeyen mevzuatta bu sistem, doğrudan yapay zekâdan
-belirgin şekilde daha doğru. %91'e karşı %57, ve bu fark ölçüldü.
-
-**Kanıtlanmayan:** genel olarak daha iyi olduğu. İş hukuku gibi bilinen
-alanlarda fark yok, ve bunu gösteren bir ölçüm de yapılmadı.
-
-**Eksik olanlar:**
-
-- Doğal dilde arama hâlâ zayıf, HyDE ile büyük ölçüde iyileşti ama tam
-  kapanmadı (bkz. README "Doğal dilde arama — ölçülen zayıflık").
-- İçtihat iş hukuku (Yargıtay) ve idari yargıdan (Danıştay: memur, disiplin,
-  mobbing) ibaret. Kira, boşanma, ceza yok.
-- Kapsam tam değil. Bazı yönetmelik ve tebliğler hâlâ sistemde olmayabilir —
-  ve sistem bunu size söyleyemiyor.
-- **Hiçbir avukat denemedi.** Değerli olduğunu ölçtük, gerçekten
-  kullanılabilir olduğunu bilmiyoruz.
-
-Sonuncusu en önemlisi. Bir hukukçunun bir saat kullanması, beş yüz sentetik
-sorudan daha çok şey öğretir.
-
----
-
-## Sayılarla
-
-| | |
+| Sekme | Ne var |
 |---|---|
-| Madde | ~275.000 |
-| Belge | ~11.850 |
-| Mahkeme kararı | ~30.800 |
-| Arama süresi | ~2 saniye |
-| Cevap süresi | ~5 saniye |
-| Otomatik test | 132 |
-| Aylık maliyet | Birkaç dolar |
-| Donanım | Bir dizüstü bilgisayar |
+| **Dayanak maddeler** | Sorunun cevabını içeren maddeler, kanuna göre gruplu |
+| **Karşı tarafın gözünden** | Soru karşı taraf adına yeniden kurulup ayrıca aranır |
+| **Mahkeme kararları** | Yargıtay kararları + "Daha fazla karar getir" |
+| **Dosyam** | Topladıkların |
 
-*Ayrıntılı ölçüm kayıtları ve yöntem notları için depodaki README ve test
-betiklerine bakılabilir.*
+Madde satırında numara, başlık ve **gövdenin ilk cümlesi** görünür.
+Bu son kısım önemli: TCK'da "Etkin pişmanlık" başlıklı 11 madde var,
+başlık tek başına ayırt etmiyor.
+
+Maddeye tıklayınca tam metin açılır; soruyla en ilgili cümle
+**sarıyla işaretlenir**. Emin değilse işaretlemez — yanlış cümleyi
+işaretlemek hiç işaretlememekten kötüdür.
+
+Açılan maddenin altında **bağlantılı maddeler** de görünür: bu maddeye
+gönderme yapanlar, bu maddenin istisnası olanlar, yaptırımını
+düzenleyenler.
+
+### Karşı tarafın gözünden
+
+```
+sen sorarsın : "işten çıkarıldım tazminat alabilir miyim"
+sistem arar  : "işverenin haklı nedenle fesih sebepleri"
+```
+
+Tavsiye vermez, zayıf nokta söylemez, "şu argümanı kullan" demez.
+Yalnızca "bu maddeler de var" der. Çıkarım avukatın.
+
+### Dosyalar (sol panel)
+
+İlk soruyu sorunca dosya kendiliğinden açılır, adını sorudan alır
+(çift tıklayarak değiştirilir).
+
+```
+yıldız işareti         maddeyi/kararı dosyaya at
+geçmiş soru            tıkla, kayıtlı cevap ANINDA gelsin
+Bilgisayara kaydet     .aibars.json dosyası indir
+Aç                     o dosyayı geri yükle
+Metin olarak kopyala   dilekçeye yapıştırılacak düz metin
+```
+
+Her şey **tarayıcıda** durur, sunucuya gitmez. Diskteki `.json` avukatın
+kendi klasöründe, dava dosyasının yanında durur; yedeklenir,
+e-postayla gönderilir, başka makinede açılır.
+
+---
+
+## 4. Yerel arşiv mi, canlı Yargıtay mı
+
+İlk cevapta **3 karar yerel arşivden** gelir — ağ isteği yok, hızlı.
+Yerelde yeterli karar yoksa canlı Yargıtay'a çıkılır.
+**"Daha fazla karar getir"** düğmesi her zaman canlıya gider ve 12
+karar daha çeker.
+
+İkisi de gerektiği ölçüldü:
+
+| Soru | Yerel | Canlı |
+|---|---|---|
+| işçi kıdem tazminatını hangi hallerde alamaz | **0,98** | 0,74 |
+| kiracı iki haklı ihtar nedeniyle tahliye | 0,99 | 0,99 |
+| marka hükümsüzlüğü davasını kim açabilir | 0,10 | **0,95** |
+| patent hakkına tecavüzde ne talep edilebilir | 0,01 | **0,95** |
+
+*(ham cross-encoder alaka puanı)*
+
+İndirilmiş alanlarda (iş, kira) yerel arşiv daha iyi; hiç
+indirilmemiş alanlarda (marka, patent) yerel fiilen sıfır. Biri
+diğerinin yerine geçmiyor.
+
+Canlı arama şöyle çalışır — Yargıtay'ın araması **anlam bilmez**, o
+yüzden soru önce hukuki terime çevrilir:
+
+```
+"babam ölmeden önce tapuyu kardeşime devretmiş,
+ mirastan pay alabilir miyim"
+            |  terime çevrilir
+            v
+      "muris muvazaası"
+            |  Yargıtay'da aranır
+            v
+   gelen kararlar bizim reranker'ımızla sıralanır
+```
+
+Bu adım atlanırsa Yargıtay kelimeleri OR'layıp alakasız karar getirir.
+Ölçüldü: doğal cümleyle arandığında "kadastro öncesi tapu iptali"
+kararları geliyordu — konu komşu ama dava başka.
+
+---
+
+## 5. Kullanılan modeller
+
+| İş | Model | Nerede çalışıyor |
+|---|---|---|
+| Gömme (anlam) | Qwen3-Embedding-0.6B | Yerel GPU (RTX 3050, 4 GB) |
+| Yeniden sıralama | BAAI/bge-reranker-v2-m3 | Yerel GPU |
+| Cevap üretimi | Gemini Flash Lite | Google API |
+| Terim / HyDE üretimi | Gemini Flash Lite | Google API |
+
+**Maliyet:** soru başına 4 Gemini çağrısı, ~6.000 token, **0,10 TL**.
+Günde 20 soru soran bir avukat için ayda ~45 lira.
+
+Kod tarafında **günlük 1 dolarlık sert tavan** var; aşılırsa istek
+reddedilir. Tavan istek sayısına değil **paraya** bakar — bir çağrının
+maliyeti 100 kat değişiyor (terim çıkarma ~200 token, cevap üretme
+~20.000 token), bu yüzden istek saymak parayı sınırlamıyor.
+
+---
+
+## 6. Bilinen sınırlar
+
+- **Danıştay boş.** İdari yargı (memur, vergi, imar) kapsanmıyor;
+  CAPTCHA çıktığı için çekim 40 kararda durduruldu. Bot denetimi
+  aşılmıyor.
+- **İstinaf (Bölge Adliye Mahkemesi) kararları yok.**
+- **Bazı sorularda ilgisiz karar geliyor.** Yerel arşiv soruyla
+  yüzeysel örtüşen kararı seçebiliyor; cross-encoder puanları
+  doyduğunda (0,999) ayırt edemiyor.
+- **HyDE bazen konuyu düşürüyor.** Aynı başlıklı çok madde olan
+  yerlerde doğru madde kaybolabiliyor. Üç çözüm denendi, ikisi
+  ölçümde geriletti; üçüncüsü (ham soruyu ayrı sinyal olarak eklemek)
+  alındı ve kapsama 33/34'ten 34/34'e çıktı.
+- **Vurgulama bazen fazla geniş.** Uzun maddede neredeyse tüm metni
+  işaretleyebiliyor; o zaman işaretlemenin anlamı kalmıyor.
+- **Kayıtlı cevaplarda karar metinleri kırpık** (4.000 karakter) ve
+  mevzuat o günden beri değişmiş olabilir.
+- **Hiçbir gerçek avukat henüz kullanmadı.** En büyük eksik bu.
+
+---
+
+## 7. Çalıştırma
+
+```bash
+python cli.py katalog          # mevzuat listesini çek
+python cli.py cek              # metinleri indir, maddelere ayır
+python cli.py indeksle         # GPU'da vektörle, BM25 kur
+python cli.py atif-grafi       # madde-madde atıfları çıkar
+python cli.py ictihat          # Yargıtay kararı indir (isteğe bağlı)
+python cli.py karar-indeksle   # kararları ayrı indekse yaz
+python zincir_kur.py           # hangi karar hangi maddeyi yorumlamış
+python server.py               # siteyi aç
+```
+
+Canlı gelen kararları kalıcı arşive katmak için:
+
+```bash
+python cli.py canli-devral
+python cli.py karar-indeksle
+```
+
+**260 test** koda eşlik ediyor:
+
+```bash
+python -m pytest tests/ -q
+```
+
+---
+
+*Aibars genel bilgi verir, hukuki görüş yerine geçmez. Cevaplar
+yalnızca indekslenmiş mevzuat metinlerine ve Yargıtay kararlarına
+dayanır. Karar dayanağı yapmadan önce bir avukata danışın.*

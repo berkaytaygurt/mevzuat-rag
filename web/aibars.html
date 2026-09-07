@@ -5,37 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Aibars — Mevzuat Asistanı</title>
 <style>
+  /* Zemin NOTR GRI. Onceki ton sicak kremdi (#faf9f6 / koyuda #141310):
+     tek basina hos duruyordu ama sarimsi-kahve egilimi butun sayfaya
+     siniyordu, ozellikle kenar cubugu eklendikten sonra "yesilimsi"
+     okundu. Nötr gri sayfayi geri plana itiyor, metin ve vurgu one
+     cikiyor -- okunacak sey hukum metni, zemin degil.
+     VURGU RENGI DEGISMEDI: marka orada. */
+  /* Kurumsal, sakin palet. Onceki hal iki kez yanlisti: once sicak krem
+     (sayfaya sarimsi-yesil siniyordu), sonra notr gri + somon vurgu
+     (#d9897a) -- gri zeminde turuncu bir tabela gibi parliyordu.
+     Simdi zemin serin ve koyu, vurgu DOYGUNLUGU DUSUK celik mavisi.
+     Renk dikkat cekmek icin degil, ayirt etmek icin var. */
   :root {
-    --bg:        #faf9f6;
+    --bg:        #f2f4f6;
     --yuzey:     #ffffff;
-    --yuzey-alt: #f3f1ec;
-    --kenar:     #e2ddd3;
-    --kenar-ince:#eeeae2;
-    --metin:     #1a1815;
-    --metin-orta:#575249;
-    --metin-sol: #8a847a;
-    --vurgu:     #7b2d26;
-    --vurgu-bg:  #f7ecea;
-    --uyari:     #8a6212;
-    --uyari-bg:  #fbf3e0;
-    --serif:     "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
-    --sans:      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    --yuzey-alt: #eaedf0;
+    --kenar:     #d5dae0;
+    --kenar-ince:#e5e9ed;
+    --metin:     #171a1d;
+    --metin-orta:#4c545c;
+    --metin-sol: #7c858e;
+    --vurgu:     #2d4f7c;
+    --vurgu-bg:  #e8eef6;
+    --uyari:     #7a5a1e;
+    --uyari-bg:  #f5efe1;
+    /* KANUN METNI icin serif. Onceki listede "Iowan Old Style" basta
+       geliyordu; o yalnizca Mac'te var ve Windows'ta Palatino Linotype'a
+       dusuyordu -- zarif ama ekranda ince, dusuk kontrastli, uzun
+       hukum metninde yoruyor. Simdi basta EKRAN ICIN tasarlanmis ve
+       Windows'ta kurulu gelen tipler var: Charter, Sitka Text, Cambria.
+       Georgia her yerde bulunan saglam yedek.
+       Neden serif: kanun metni basili hukuk diliyle ayni yerde durmali
+       ve arayuz yazisindan (sans) GORSEL OLARAK ayrilmali -- avukat
+       neyin hukum, neyin bizim yorumumuz oldugunu bir bakista gorsun. */
+    --serif:     Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, "Times New Roman", serif;
+    --sans:      -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
     --mono:      ui-monospace, "Cascadia Mono", Consolas, monospace;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg:#141310; --yuzey:#1c1b16; --yuzey-alt:#232219; --kenar:#33302700;
-      --kenar:#332f27; --kenar-ince:#26241d;
-      --metin:#eeebe3; --metin-orta:#a8a297; --metin-sol:#7d776c;
-      --vurgu:#d9897a; --vurgu-bg:#2a1d1a;
-      --uyari:#d4a856; --uyari-bg:#282112;
+      --bg:#171a1d; --yuzey:#1e2226; --yuzey-alt:#23282d;
+      --kenar:#2f353b; --kenar-ince:#252a2f;
+      --metin:#dde2e7; --metin-orta:#98a1aa; --metin-sol:#6d757d;
+      --vurgu:#8fadd0; --vurgu-bg:#1c2530;
+      --uyari:#b3986a; --uyari-bg:#241f16;
     }
   }
   :root[data-theme="dark"] {
-    --bg:#141310; --yuzey:#1c1b16; --yuzey-alt:#232219; --kenar:#332f27;
-    --kenar-ince:#26241d; --metin:#eeebe3; --metin-orta:#a8a297;
-    --metin-sol:#7d776c; --vurgu:#d9897a; --vurgu-bg:#2a1d1a;
-    --uyari:#d4a856; --uyari-bg:#282112;
+    --bg:#171a1d; --yuzey:#1e2226; --yuzey-alt:#23282d; --kenar:#2f353b;
+    --kenar-ince:#252a2f; --metin:#dde2e7; --metin-orta:#98a1aa;
+    --metin-sol:#6d757d; --vurgu:#8fadd0; --vurgu-bg:#1c2530;
+    --uyari:#b3986a; --uyari-bg:#241f16;
   }
 
   * { box-sizing: border-box; }
@@ -46,6 +66,84 @@
     -webkit-font-smoothing: antialiased;
   }
   .kabuk { max-width: 720px; margin: 0 auto; padding: 0 24px 96px; }
+
+  /* ---------- dosya kenar cubugu ----------
+     NEDEN: sistem soru-cevap kutusuydu, her soru sifirdan basliyordu.
+     Avukat SORUYA degil DOSYAYA calisir: bir dosya icin on-onbes soru
+     sorar, ise yarayan maddeleri toplar, dilekce yazarken hepsine
+     tekrar bakar. Sayfa kapaninca her sey kayboluyordu.
+
+     Kaydedilen sey TUM SONUC degil, ISARETLENEN madde. Olculdu: bir
+     cevabin tamami 138 KB (on maddenin metni + vurgu parcalari + graf),
+     yani tarayici hafizasi birkac duzine soruda doluyor -- ustelik o on
+     maddenin cogu zaten ise yaramiyor. Isaretlenen madde ~1,5 KB.  */
+  .uygulama { display: flex; align-items: flex-start; }
+  .kenar {
+    position: sticky; top: 0; flex: none; width: 250px; height: 100vh;
+    /* Zeminle AYNI renk, yalnizca ince bir cizgi ayiriyor.
+       --yuzey-alt denendi ve geri alindi: o ton (koyu temada #232219)
+       maviden fakir, yani zeytin. Kucuk yerlerde (uzerine gelme, sekme
+       seridi) fark etmiyor ama ekranin solunda 250 piksellik bir blok
+       olunca goz onu ORTAM rengi saniyor ve butun sayfa yesile
+       calisiyor. Palet degismedi; degisen sey o tonun kapladigi alan. */
+    border-right: 1px solid var(--kenar-ince); background: var(--bg);
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+  .kenar-bas {
+    padding: 18px 16px 12px; display: flex; align-items: center;
+    justify-content: space-between; gap: 8px;
+  }
+  .kenar-bas h2 {
+    margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .09em;
+    text-transform: uppercase; color: var(--metin-sol);
+  }
+  .kenar-ekle {
+    border: 1px solid var(--kenar); background: var(--yuzey);
+    color: var(--metin-orta); border-radius: 4px; cursor: pointer;
+    font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px;
+  }
+  .kenar-ekle:hover { border-color: var(--vurgu); color: var(--vurgu); }
+  .kenar-liste { overflow-y: auto; padding: 0 8px 16px; flex: 1; }
+  .dosya {
+    padding: 9px 10px; border-radius: 4px; cursor: pointer;
+    display: flex; align-items: center; gap: 8px; font-size: 14px;
+    color: var(--metin-orta);
+  }
+  .dosya:hover { background: var(--yuzey); }
+  .dosya.secili { background: var(--yuzey); color: var(--metin); font-weight: 500; }
+  .dosya-ad { flex: 1; min-width: 0; overflow: hidden;
+              text-overflow: ellipsis; white-space: nowrap; }
+  .dosya-sayi {
+    flex: none; font-size: 11px; color: var(--metin-sol);
+    font-variant-numeric: tabular-nums;
+  }
+  .dosya-sil {
+    flex: none; border: 0; background: none; cursor: pointer; padding: 2px 4px;
+    color: var(--metin-sol); font-size: 14px; line-height: 1; visibility: hidden;
+  }
+  .dosya:hover .dosya-sil { visibility: visible; }
+  .dosya-sil:hover { color: var(--vurgu); }
+  .kenar-gecmis { padding: 2px 0 6px 18px; }
+  .gecmis-soru {
+    display: block; width: 100%; text-align: left; border: 0; background: none;
+    font: inherit; font-size: 12.5px; color: var(--metin-sol);
+    padding: 5px 8px; border-radius: 4px; cursor: pointer;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .gecmis-soru:hover { background: var(--yuzey); color: var(--metin-orta); }
+
+  /* Dar ekranda kenar cubugu ustte yatay serit olur; cekmece yapmak
+     iki ayri etkilesim modeli demek, tek moda sadik kaliyoruz. */
+  @media (max-width: 900px) {
+    .uygulama { display: block; }
+    .kenar {
+      position: static; width: auto; height: auto; border-right: 0;
+      border-bottom: 1px solid var(--kenar-ince);
+    }
+    .kenar-liste { display: flex; gap: 6px; overflow-x: auto; padding: 0 12px 12px; }
+    .kenar-gecmis { display: none; }
+    .dosya { flex: none; }
+  }
 
   /* ---------- üst bant ---------- */
   header {
@@ -76,7 +174,7 @@
     width: 100%; padding: 18px 64px 18px 20px;
     font-family: var(--sans); font-size: 17px; color: var(--metin);
     background: var(--yuzey); border: 1px solid var(--kenar);
-    border-radius: 14px; resize: none; min-height: 60px; max-height: 220px;
+    border-radius: 5px; resize: none; min-height: 60px; max-height: 220px;
     /* hidden: kutu icerige gore buyudugu icin kaydirma cubuguna gerek yok.
        auto birakildiginda cubuk cikip gonder tusunun ustune biniyordu.
        Yalnizca max-height'a ulasinca (JS ile) auto'ya cevriliyor. */
@@ -94,7 +192,7 @@
     width: 40px; height: 40px; display: grid; place-items: center;
     flex: none; z-index: 2;
     color: #fff; background: var(--vurgu); border: none;
-    border-radius: 10px; cursor: pointer; transition: opacity .15s;
+    border-radius: 5px; cursor: pointer;
   }
   #gonder svg { width: 17px; height: 17px; }
   #gonder:hover:not(:disabled) { opacity: .85; }
@@ -110,7 +208,7 @@
   #ayarAc:hover { color: var(--metin-orta); }
   #ayarlar {
     display: none; margin-top: 12px; padding: 14px 16px;
-    background: var(--yuzey-alt); border-radius: 10px;
+    background: var(--yuzey-alt); border-radius: 4px;
     font-size: 13.5px; color: var(--metin-orta);
   }
   #ayarlar.acik { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
@@ -141,12 +239,12 @@
   .karsi-not { font-size: 12px; opacity: .72; margin-bottom: 10px; }
   .karsi .madde { border-left: 3px solid #b8873a; }
   .guven-uyari {
-    margin: 10px 0 6px; padding: 10px 12px; border-radius: 7px;
+    margin: 10px 0 6px; padding: 10px 12px; border-radius: 4px;
     font-size: 12.5px; line-height: 1.5;
     border-left: 3px solid #b8873a; background: rgba(184,135,58,.12);
   }
   .anlasilan {
-    margin: 8px 0 2px; padding: 8px 12px; border-radius: 7px;
+    margin: 8px 0 2px; padding: 8px 12px; border-radius: 4px;
     font-size: 12.5px; line-height: 1.5;
     background: rgba(120,130,160,.10);
     border-left: 3px solid #6b7a99;
@@ -155,7 +253,7 @@
   .anlasilan i { opacity: .8; font-style: normal; }
   .daire-dagilim { font-size: 11.5px; opacity: .75; margin-bottom: 5px; }
   .dogrulama {
-    margin: 10px 0 4px; padding: 9px 12px; border-radius: 7px;
+    margin: 10px 0 4px; padding: 9px 12px; border-radius: 4px;
     font-size: 12.5px; line-height: 1.5;
     border-left: 3px solid #5c8a63; background: rgba(92,138,99,.10);
   }
@@ -183,18 +281,32 @@
     font-size: 11.5px; opacity: .78; line-height: 1.5;
     padding: 3px 0 6px 12px; font-style: italic;
   }
-  .yorum-satir { padding: 2px 0 2px 10px; border-left: 2px solid #8b6f47; margin-bottom: 3px; }
+  .yorum-satir { padding: 2px 0 2px 10px; border-left: 2px solid var(--kenar); margin-bottom: 3px; }
+  /* Karar da kart degil satir. Eski kural TANIMSIZ degiskenler
+     kullaniyordu (--cizgi, --kart): gecersiz var() yuzunden kenarlik
+     rengi metin rengine dusuyordu. Ustelik #8b6f47 sabit kahverengi
+     eski sicak paletten kalmaydi ve gri zeminle catisiyordu. */
   .karar {
-    border: 1px solid var(--cizgi);
-    border-left: 3px solid #8b6f47;
-    border-radius: 6px;
-    margin-bottom: 8px;
-    background: var(--kart);
+    background: var(--yuzey); border: 1px solid var(--kenar-ince);
+    border-radius: 6px; margin-bottom: 6px; overflow: hidden;
   }
+  .karar.acik { border-color: var(--kenar); }
   .karar-ad { font-weight: 600; font-size: 14px; }
   .karar-tarih { margin-left: auto; font-size: 12px; opacity: .6; }
   .karar-not {
     font-size: 12px; opacity: .7; margin: -6px 0 10px 2px;
+  }
+  /* Sabit renkler kullaniliyordu (#fff8e1 / #78350f): KOYU TEMADA
+     bembeyaz bir kutu ciziyordu. Tema degiskenleri sart. */
+  .karar-kaynak {
+    background: var(--uyari-bg); border-left: 2px solid var(--uyari);
+    padding: 8px 12px; margin: 0 0 12px; font-size: 12.5px;
+    color: var(--uyari);
+  }
+  /* Canli kaynak normal durum, uyari degil: notr. */
+  .karar-kaynak.canli {
+    background: var(--yuzey-alt); border-left-color: var(--kenar);
+    color: var(--metin-sol);
   }
   .cevap {
     font-family: var(--serif); font-size: 18px; line-height: 1.75;
@@ -231,16 +343,29 @@
   .grup-kaynak:hover { text-decoration: underline; }
 
   /* ---------- madde kartı ---------- */
+  /* KART DEGIL SATIR. Onceki hal her maddeyi yuvarlak koseli, kenarlikli,
+     arka planli bir kutuya koyuyordu; on madde alt alta dizilince sayfa
+     kutu yiginina donuyor ve "uretilmis arayuz" gibi okunuyordu. Basili
+     hukuk metni de, ciddi bir referans arayuzu de kutu kullanmaz: ince
+     bir cizgi ayirir, isi TIPOGRAFI yapar. */
+  /* Kutular GERI GELDI. Cizgiye cevirmek "uretilmis arayuz" hissini
+     azaltiyordu ama okunabilirligi de goturuyordu: on madde ayrimsiz
+     bir listeye donuyor, hangi ozetin hangi maddeye ait oldugu
+     kayboluyordu. Kutu kalsin ama SESSIZ olsun -- golge yok, kalin
+     kenarlik yok, kucuk yaricap. */
   .madde {
     background: var(--yuzey); border: 1px solid var(--kenar-ince);
-    border-radius: 10px; margin-bottom: 8px; overflow: hidden;
-    transition: border-color .15s;
+    border-radius: 6px; margin-bottom: 6px; overflow: hidden;
   }
   .madde.acik { border-color: var(--kenar); }
   .madde-bas {
-    padding: 13px 16px; cursor: pointer; display: flex;
-    align-items: center; gap: 13px;
+    padding: 12px 16px; cursor: pointer; display: flex;
+    /* Satir artik iki satirli (baslik + ozet): ortalamak yerine ustten
+       hizalanmali, yoksa madde numarasi ozetin ortasina kayiyor. */
+    align-items: flex-start; gap: 13px;
   }
+  /* Numara ve ok, baslik satirinin hizasinda dursun. */
+  .madde-bas > .ok, .madde-bas > .madde-no { margin-top: 3px; }
   .madde-bas:hover { background: var(--yuzey-alt); }
   .madde-no {
     flex: none; min-width: 62px;
@@ -252,10 +377,55 @@
     font-family: var(--serif); font-size: 16px; font-weight: 500;
     line-height: 1.35;
   }
+  /* Govdenin ilk (ya da soruyla en ilgili) cumlesi. Ayni baslikli
+     maddeleri birbirinden ayiran sey bu satir. */
+  .madde-ozet {
+    display: block; margin-top: 3px;
+    font-family: var(--sans); font-size: 13px; font-weight: 400;
+    line-height: 1.45; color: var(--metin-sol);
+  }
+  .madde.acik .madde-ozet { display: none; }   /* acikken govde zaten var */
   .ok {
     flex: none; font-size: 10px; color: var(--metin-sol);
     transition: transform .18s;
   }
+  /* Dosyaya ekleme yildizi. Satirin sagina sabit; isaretliyken dolu. */
+  .isaret {
+    flex: none; margin-top: 1px; border: 0; background: none; cursor: pointer;
+    font-size: 15px; line-height: 1; padding: 2px 2px 2px 8px;
+    color: var(--metin-sol); transition: color .15s;
+  }
+  .isaret:hover { color: var(--vurgu); }
+  .isaret.ekli { color: var(--vurgu); }
+  .karar-sayi {
+    flex: none; margin-top: 2px; font-size: 11px; font-weight: 600;
+    letter-spacing: .02em; color: var(--metin-sol);
+    background: var(--yuzey-alt); border: 1px solid var(--kenar-ince);
+    border-radius: 3px; padding: 2px 7px; white-space: nowrap;
+  }
+
+  .dosya-not {
+    width: 100%; margin: 0 0 16px; padding: 11px 13px;
+    font: inherit; font-size: 14px; color: var(--metin);
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-radius: 10px; resize: vertical; line-height: 1.5;
+  }
+  .dosya-not:focus { outline: none; border-color: var(--vurgu); }
+  .dosya-eylem { display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap; }
+  .daha-karar {
+    display: block; width: 100%; margin: 14px 0 4px;
+    border: 1px solid var(--kenar); background: var(--yuzey);
+    color: var(--metin-orta); border-radius: 6px; cursor: pointer;
+    font: inherit; font-size: 13px; padding: 11px;
+  }
+  .daha-karar:hover:not(:disabled) { border-color: var(--vurgu); color: var(--vurgu); }
+  .daha-karar:disabled { opacity: .55; cursor: default; }
+  .disa-aktar {
+    border: 1px solid var(--kenar); background: var(--yuzey);
+    color: var(--metin-orta); border-radius: 9px; cursor: pointer;
+    font: inherit; font-size: 13px; padding: 9px 14px;
+  }
+  .disa-aktar:hover { border-color: var(--vurgu); color: var(--vurgu); }
   /* Karar kartlari .karar sinifini tasiyor. Acma kurali yalnizca .madde
      icin yazilmisti ve kararlar HIC acilmiyordu -- tiklaniyor, "acik"
      sinifi ekleniyor, ama hicbir kural eslesmedigi icin govde gizli
@@ -269,8 +439,10 @@
   }
   .madde-govde {
     display: none; padding: 4px 16px 18px;
-    font-family: var(--serif); font-size: 16px; line-height: 1.75;
-    color: var(--metin-orta);
+    font-family: var(--serif); font-size: 16.5px; line-height: 1.8;
+    /* Asil metin rengi: hukum metni SAYFANIN ICERIGI, yan not degil.
+       --metin-orta ile soluk gosterilince uzun pasaj yoruyordu. */
+    color: var(--metin);
     border-top: 1px solid var(--kenar-ince);
     margin: 0 0 0; padding-top: 14px;
   }
@@ -365,6 +537,26 @@
   /* Ipucu satiri: olculdu -- ayni mesele "olay anlatimi" olarak soruldugunda
      dogru madde 5 soruda 1'inde 1. sirada, "hukuki kavram" olarak
      soruldugunda 5'inde 5'inde. Bu farki kullaniciya soylemek bedava. */
+  .sorulan {
+    margin: 26px 0 22px; padding-left: 14px;
+    border-left: 2px solid var(--kenar);
+    font-family: var(--serif); font-size: 18px; line-height: 1.45;
+    color: var(--metin-orta);
+  }
+  .kayitli-serit {
+    margin: -10px 0 22px; font-size: 12px; color: var(--metin-sol);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .kayitli-serit button {
+    border: 0; background: none; padding: 0; cursor: pointer;
+    font: inherit; color: var(--vurgu); text-decoration: underline;
+  }
+  .sorulan-etiket {
+    display: block; margin-bottom: 4px;
+    font-family: var(--sans); font-size: 11px; font-weight: 600;
+    letter-spacing: .09em; text-transform: uppercase;
+    color: var(--metin-sol);
+  }
   .ipucu-satiri {
     margin: 16px 2px 0; font-size: 12.5px; color: var(--metin-sol);
     line-height: 1.6;
@@ -375,18 +567,20 @@
      Once hepsi tek sutunda alt alta duruyordu ve sonuc sayfasi
      okunamayacak kadar uzuyordu (10 madde + 5 karsi madde + 3 karar). */
   .sekmeler {
-    display: flex; flex-wrap: wrap; gap: 6px; margin: 30px 0 18px;
-    border-bottom: 1px solid var(--kenar-ince); padding-bottom: 10px;
+    display: flex; flex-wrap: wrap; gap: 20px; margin: 30px 0 18px;
+    border-bottom: 1px solid var(--kenar-ince);
   }
+  /* Hap seklinde dugmeler yerine altcizgili metin: sekme zaten bir
+     gezinme ogesi, dugme degil. */
   .sekme {
     display: inline-flex; align-items: center; gap: 7px;
-    padding: 7px 13px; font-size: 13.5px; font-family: inherit;
-    border: 1px solid var(--kenar); border-radius: 999px; cursor: pointer;
-    background: none; color: var(--metin-orta);
+    padding: 8px 2px; font-size: 13.5px; font-family: inherit;
+    border: 0; border-bottom: 2px solid transparent; cursor: pointer;
+    background: none; color: var(--metin-sol);
   }
-  .sekme:hover { border-color: var(--metin-sol); }
+  .sekme:hover { color: var(--metin-orta); }
   .sekme.secili {
-    background: var(--metin); color: var(--bg); border-color: var(--metin);
+    color: var(--metin); border-bottom-color: var(--vurgu);
   }
   .sekme-sayi {
     font-size: 11.5px; font-variant-numeric: tabular-nums;
@@ -421,6 +615,18 @@
 </style>
 </head>
 <body>
+<div class="uygulama">
+<aside class="kenar">
+  <div class="kenar-bas">
+    <h2 title="Çift tıklayarak adını değiştirin">Dosyalar</h2>
+    <span style="display:flex;gap:6px">
+      <button class="kenar-ekle" id="dosyaAc" title="Kaydedilmiş dosyayı aç">Aç</button>
+      <button class="kenar-ekle" id="dosyaEkle">+ Yeni</button>
+    </span>
+  </div>
+  <input type="file" id="dosyaGirdi" accept=".json,application/json" hidden>
+  <div class="kenar-liste" id="dosyaListe"></div>
+</aside>
 <div class="kabuk">
 
   <header>
@@ -464,6 +670,7 @@
     Karar dayanağı yapmadan önce bir avukata danışın.
   </footer>
 
+</div>
 </div>
 
 <script>
@@ -703,6 +910,295 @@ function maddeEtiketi(m) {
   return '<span class="madde-onizleme">' + kacis(kisa) + "</span>";
 }
 
+/* ==================================================================
+   DOSYALAR -- avukatin calisma masasi
+
+   NEDEN VAR
+   Sistem soru-cevap kutusuydu: her soru sifirdan basliyor, sayfa
+   kapaninca sorulan da bulunan da kayboluyordu. Oysa avukat SORUYA
+   degil DOSYAYA calisir -- bir dosya icin on-onbes soru sorar, ise
+   yarayan maddeleri toplar, dilekce yazarken hepsine tekrar bakar.
+
+   NE SAKLANIYOR, NE SAKLANMIYOR
+   Tum sonucu saklamak akla ilk geliyor ama olculdu: bir cevabin tamami
+   138 KB (on maddenin metni + vurgu parcalari + atif grafi). Tarayici
+   hafizasi (~5 MB) birkac duzine soruda doluyor ve o on maddenin cogu
+   zaten ise yaramiyor. Bu yuzden saklanan sey ISARETLENEN madde:
+   ~1,5 KB, ve avukatin gercekten yaptigi sey de bu.
+
+   Sorular yalnizca METIN olarak saklaniyor; tiklaninca yeniden
+   soruluyor. Boylece hem yer kaplamiyor hem de cevap guncel geliyor.
+
+   NEREDE DURUYOR
+   Tarayicinin localStorage'inda -- yani KULLANICININ makinesinde.
+   Sunucuya gitmiyor. Bu bilincli: site tek sifreyle disari acik ve
+   dosyalar sunucuda tutulsa herkes birbirinin dosyasini gorurdu.
+   Bedeli: baska tarayicida acinca dosyalar gelmez.
+   ================================================================== */
+// Son cizilen cevap. Isaretleme dugmesi tiklandiginda maddenin tam
+// kaydina buradan ulasiliyor -- DOM'dan geri okumak yerine.
+let sonVeri = null;
+
+const DEPO_ANAHTAR = "aibars.dosyalar.v1";
+
+const Depo = {
+  oku() {
+    try {
+      const ham = localStorage.getItem(DEPO_ANAHTAR);
+      const d = ham ? JSON.parse(ham) : null;
+      if (d && Array.isArray(d.dosyalar)) return d;
+    } catch (e) { /* bozuk ya da erisilemez: bostan basla */ }
+    return { dosyalar: [], acik: null };
+  },
+  yaz(d) {
+    try {
+      localStorage.setItem(DEPO_ANAHTAR, JSON.stringify(d));
+      return true;
+    } catch (e) {
+      // Kota dolabilir ya da tarayici depolamayi engelleyebilir
+      // (gizli sekme, site verisi kapali). Sessizce gecmiyoruz:
+      // kullanici kaydettigini saniyorsa daha kotu.
+      alert("Dosya kaydedilemedi — tarayıcı depolaması dolu veya kapalı.");
+      return false;
+    }
+  },
+};
+
+let dosyalar = Depo.oku();
+
+function acikDosya() {
+  return dosyalar.dosyalar.find(function (x) { return x.id === dosyalar.acik; }) || null;
+}
+
+function dosyaKaydet() { Depo.yaz(dosyalar); dosyalariCiz(); }
+
+function dosyaYeni(ad) {
+  const d = {
+    id: "d" + Date.now().toString(36),
+    ad: ad || "Yeni dosya",
+    sorular: [],       // yalnizca metin
+    maddeler: [],      // isaretlenenler
+    kararlar: [],
+  };
+  dosyalar.dosyalar.unshift(d);
+  dosyalar.acik = d.id;
+  dosyaKaydet();
+  return d;
+}
+
+function dosyaSil(id) {
+  const d = dosyalar.dosyalar.find(function (x) { return x.id === id; });
+  if (!d) return;
+  const sayi = d.maddeler.length + d.kararlar.length;
+  if (sayi && !confirm('"' + d.ad + '" dosyası ve içindeki ' + sayi +
+                       " kayıt silinecek. Emin misiniz?")) return;
+  dosyalar.dosyalar = dosyalar.dosyalar.filter(function (x) { return x.id !== id; });
+  if (dosyalar.acik === id) dosyalar.acik = null;
+  dosyaKaydet();
+}
+
+function dosyaAdiUret(soru) {
+  // ChatGPT gibi: ilk sorudan bir ad turet. Avukat sonra degistirebilir.
+  const t = (soru || "").replace(/\s+/g, " ").trim();
+  if (!t) return "Adsız dosya";
+  return t.length > 42 ? t.slice(0, 42).replace(/\s+\S*$/, "") + "…" : t;
+}
+
+/* Kaydedilecek cevabin kucultulmus kopyasi.
+
+   OLCULDU (tek cevap, 138.782 bayt):
+       maddeler   18.206
+       kararlar  120.072   <- tek bir karar 66.945 karakter
+   Yani sisiren sey KARAR METINLERI. Maddeler tam saklaniyor (avukatin
+   okuyacagi asil metin onlar), karar metni kirpiliyor. Boylece bir
+   cevap ~30 KB'a iniyor ve tarayici hafizasina (~5 MB) yuzlercesi
+   sigiyor.
+
+   Vurgu parcalari ve atif grafi atiliyor: birlikte 1 KB bile degil ama
+   kayitli cevapta anlamlari yok -- vurgu o anki soruya gore
+   hesaplanmisti. */
+const KARAR_KIRP = 4000;
+const EN_FAZLA_KAYIT = 60;
+
+function kucult(d) {
+  const k = {
+    soru: d.soru, cevap: d.cevap, cevap_hatasi: d.cevap_hatasi,
+    dogrulama: d.dogrulama, anlasilan: d.anlasilan, guven: d.guven,
+    karar_kaynagi: d.karar_kaynagi, kayitli: true, zaman: Date.now(),
+    maddeler: (d.maddeler || []).map(function (m) {
+      const c = Object.assign({}, m);
+      delete c.parcalar; delete c.graf; delete c.yorumlayan_kararlar;
+      return c;
+    }),
+    kararlar: (d.kararlar || []).map(function (x) {
+      const c = Object.assign({}, x);
+      if ((c.metin || "").length > KARAR_KIRP) {
+        c.metin = c.metin.slice(0, KARAR_KIRP);
+        c.kirpildi = true;
+      }
+      return c;
+    }),
+  };
+  if (d.karsi_taraf) k.karsi_taraf = d.karsi_taraf;
+  return k;
+}
+
+function cevapKaydet(d) {
+  if (!d || !d.soru) return;
+  let dosya = acikDosya();
+  if (!dosya) dosya = dosyaYeni(dosyaAdiUret(d.soru));
+  dosya.cevaplar = dosya.cevaplar || [];
+  // Ayni soru tekrar sorulursa eskisini degistir, listede bir kez dursun.
+  dosya.cevaplar = dosya.cevaplar.filter(function (x) { return x.soru !== d.soru; });
+  dosya.cevaplar.unshift(kucult(d));
+  if (dosya.cevaplar.length > EN_FAZLA_KAYIT) dosya.cevaplar.length = EN_FAZLA_KAYIT;
+  dosyaKaydet();
+}
+
+function kayitliCevap(soru) {
+  const d = acikDosya();
+  if (!d || !d.cevaplar) return null;
+  return d.cevaplar.find(function (x) { return x.soru === soru; }) || null;
+}
+
+function soruKaydet(soru) {
+  if (!soru) return;
+  // ACIK DOSYA YOKSA KENDILIGINDEN AC.
+  // Once "dosya acilmamissa kaydetme" yaziyordu; kullanici soru sordu,
+  // sayfayi yeniledi ve solda hicbir sey yoktu -- hakli olarak
+  // "kendi kaydetmesi lazimdi" dedi. Dosya acmayi ON KOSUL yapmak
+  // fazladan bir adim ve kimse yapmiyor; ChatGPT de ilk mesajda
+  // sohbeti kendi yaratir.
+  let d = acikDosya();
+  if (!d) d = dosyaYeni(dosyaAdiUret(soru));
+  // Ayni soru tekrar sorulursa listede bir kez dursun, en uste gelsin.
+  d.sorular = d.sorular.filter(function (x) { return x !== soru; });
+  d.sorular.unshift(soru);
+  if (d.sorular.length > 40) d.sorular.length = 40;
+  dosyaKaydet();
+}
+
+function dosyalariCiz() {
+  const kap = document.getElementById("dosyaListe");
+  if (!kap) return;
+  if (!dosyalar.dosyalar.length) {
+    kap.innerHTML = '<div class="gecmis-soru" style="cursor:default">' +
+      "Henüz dosya yok.</div>";
+    return;
+  }
+  let h = "";
+  dosyalar.dosyalar.forEach(function (d) {
+    const secili = d.id === dosyalar.acik;
+    const sayi = d.maddeler.length + d.kararlar.length;
+    h += '<div class="dosya' + (secili ? " secili" : "") +
+         '" data-dosya="' + kacis(d.id) + '">' +
+           '<span class="dosya-ad">' + kacis(d.ad) + "</span>" +
+           (sayi ? '<span class="dosya-sayi">' + sayi + "</span>" : "") +
+           '<button class="dosya-sil" data-sil="' + kacis(d.id) +
+             '" title="Dosyayı sil">×</button>' +
+         "</div>";
+    if (secili && d.sorular.length) {
+      h += '<div class="kenar-gecmis">';
+      d.sorular.forEach(function (q) {
+        h += '<button class="gecmis-soru" data-soru="' + kacis(q) + '">' +
+             kacis(q) + "</button>";
+      });
+      h += "</div>";
+    }
+  });
+  kap.innerHTML = h;
+}
+
+function dosyadaMi(tur, kimlik) {
+  const d = acikDosya();
+  if (!d) return false;
+  return (tur === "madde" ? d.maddeler : d.kararlar)
+    .some(function (x) { return x.kimlik === kimlik; });
+}
+
+function maddeKimlik(m) {
+  return (m.mevzuat_no || m.mevzuat_adi || "") + "#" + (m.madde_no || "");
+}
+
+function isaretDugmesi(tur, kimlik) {
+  // Dosya secili degilken de gorunuyor: tiklaninca dosya kuruluyor.
+  // Once "dosya acin" demek fazladan bir adim, avukat vazgeciyor.
+  const ekli = dosyadaMi(tur, kimlik);
+  return '<button class="isaret' + (ekli ? " ekli" : "") +
+    '" data-isaret="' + kacis(tur) + '" data-kimlik="' + kacis(kimlik) +
+    '" title="' + (ekli ? "Dosyadan çıkar" : "Dosyaya ekle") + '">' +
+    (ekli ? "★" : "☆") + "</button>";
+}
+
+function isaretDegistir(tur, kimlik) {
+  let d = acikDosya();
+  if (!d) d = dosyaYeni("Adsız dosya");
+  const liste = tur === "madde" ? d.maddeler : d.kararlar;
+  const yer = liste.findIndex(function (x) { return x.kimlik === kimlik; });
+  if (yer >= 0) {
+    liste.splice(yer, 1);
+  } else {
+    const kaynak = tur === "madde"
+      ? (sonVeri.maddeler || []).find(function (m) { return maddeKimlik(m) === kimlik; })
+      : (sonVeri.kararlar || []).find(function (k) { return (k.kisa_ad || "") === kimlik; });
+    if (!kaynak) return;
+    // Yalnizca gerekli alanlar saklaniyor: vurgu parcalari ve atif grafi
+    // birlikte bir cevabi 138 KB yapiyor, tarayici hafizasini doldurur.
+    liste.push(tur === "madde" ? {
+      kimlik: kimlik, mevzuat_adi: kaynak.mevzuat_adi, mevzuat_no: kaynak.mevzuat_no,
+      madde_no: kaynak.madde_no, baslik: kaynak.baslik, metin: kaynak.metin,
+      resmi_url: kaynak.resmi_url, mulga: kaynak.mulga,
+    } : {
+      kimlik: kimlik, kisa_ad: kaynak.kisa_ad, daire: kaynak.daire,
+      esas_no: kaynak.esas_no, karar_no: kaynak.karar_no,
+      karar_tarihi: kaynak.karar_tarihi, metin: kaynak.metin,
+    });
+  }
+  dosyaKaydet();
+  if (sonVeri) ciz(sonVeri);      // yildizlar tazelensin
+}
+
+function maddeOzet(m) {
+  // Satirda BASLIK cogu zaman ayirt etmiyor. Olculdu: "uyusturucu madde
+  // ticaretinde etkin pismanlik" sorusunda gelen on maddenin ucu de
+  // "Etkin pismanlik" baslikli -- TCK'da bu baslikta 11 madde var
+  // (m.93, 110, 168, 192, 201, 221, 248, 254, 269, 274, 293). Avukat
+  // hangisinin isine yaradigini anlamak icin ucunu de acmak zorunda
+  // kaliyor. Govdenin ilk cumlesi ayrimi hemen kuruyor:
+  //     m.192  "Uyusturucu veya uyarici madde imal ve ticareti ..."
+  //     m.254  "Rusvet alan kisinin, durum resmi makamlarca ..."
+  // Vurgu acikken soruyla ILGILI parca one cikariliyor; kapaliysa
+  // metnin basi kullaniliyor.
+  let kaynak = "";
+  const parcalar = m.parcalar || [];
+  for (const p of parcalar) {
+    if (p && p.vurgu && p.metin) { kaynak = p.metin; break; }
+  }
+  if (!kaynak) kaynak = (m.metin || "");
+  kaynak = kaynak.replace(/\s+/g, " ").trim();
+  // Onizlemede GURULTU olan isaretleri at. Bunlar madde metninde
+  // gereklidir (avukat hangi kanunla degistigini gormeli) ama tek
+  // satirlik ozette yer kapliyor ve ayirt edici kismi disari itiyor:
+  //     "(1) (Değişik: 2/7/2012-6352/88 md.) Rüşvet alan kişinin..."
+  //      ^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 38 karakter, sifir bilgi
+  // Govdenin tamami acildiginda hepsi yerinde duruyor.
+  kaynak = kaynak
+    .replace(/\((?:Değişik|Ek|Mülga|İptal|Yeniden düzenleme).{0,120}?\)/gi, "")
+    .replace(/\((?:\.\.\.|…)\)\d*/g, "")   // dipnot artigi: "(…)10"
+    .replace(/^\(\d{1,2}\)\s*/, "")   // fikra isareti: "(1) "
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  if (!kaynak) return "";
+  // Basliksiz maddelerde baslik yerine zaten metin onizlemesi
+  // gosteriliyor; ayni metni iki kez yazmayalim.
+  if (!m.baslik) return "";
+  const sinir = 110;
+  const kisa = kaynak.length > sinir
+    ? kaynak.slice(0, sinir).replace(/\s+\S*$/, "") + "…"
+    : kaynak;
+  return '<span class="madde-ozet">' + kacis(kisa) + "</span>";
+}
+
 function fikralara(metin) {
   const t = (metin || "").trim();
   if (!t) return "";
@@ -788,6 +1284,22 @@ function grafBaglantilari(m) {
   return h + "</div>";
 }
 
+function kararSayisiRozeti(m) {
+  // Kac karar bu maddeyi yorumlamis -- KAPALI satirda. Bilgi zaten
+  // vardi ama yalnizca madde acildiginda goruluyordu; on maddelik bir
+  // listede hangisinin cok islenmis oldugunu gormek icin hepsini
+  // acmak gerekiyordu.
+  //
+  // SINIRI: atif zinciri kulliyatin tamamini kapsamiyor (elimizdeki
+  // kararlardan cikarildi), yani rozetin YOKLUGU "hic karar yok"
+  // demek degil. Bu yuzden sifir gosterilmiyor -- olmayan bir sey
+  // hakkinda sessiz kalmak, yanlis sifir yazmaktan iyi.
+  const n = (m.yorumlayan_kararlar || []).length;
+  if (!n) return "";
+  return '<span class="karar-sayi" title="Bu maddeyi yorumlayan karar sayısı">' +
+    n + " karar</span>";
+}
+
 function yorumlayanlar(m) {
   const k = m.yorumlayan_kararlar;
   if (!k || !k.length) return "";
@@ -825,7 +1337,39 @@ function yorumlayanlar(m) {
 }
 
 function ciz(d) {
+  // Ilk kullanim ipucu SONUC EKRANINDA gurultu: iki satirlik olcum
+  // aciklamasi cevabi asagi itiyor ve avukat onu bir kez okuduktan
+  // sonra bir daha okumuyor. Sonuc gelince gizleniyor, arama kutusu
+  // temizlenince geri geliyor.
+  const ipucu = document.querySelector(".ipucu-satiri");
+  if (ipucu) ipucu.hidden = true;
+  sonVeri = d;
+  if (d.soru) {
+    soruKaydet(d.soru);
+    // Kayitli bir cevabi geri cizerken tekrar kaydetmiyoruz: kirpilmis
+    // surumu bir kez daha kirpmak ve zamani guncellemek anlamsiz.
+    if (!d.kayitli) cevapKaydet(d);
+  }
+
   let h = "";
+
+  // SORULAN SORU ekranda kalmali. Cevap gelince kutu temizleniyordu ve
+  // sayfada neye cevap verildigini soyleyen hicbir sey kalmiyordu --
+  // ozellikle netlestirme sonrasi, cunku orada aranan sey kullanicinin
+  // yazdigindan farkli.
+  if (d.soru) {
+    h += '<div class="sorulan"><span class="sorulan-etiket">Soru</span>' +
+      kacis(d.soru) + "</div>";
+  }
+  if (d.kayitli) {
+    // Kayitli cevap CANLI cevaptan farkli: karar metinleri kirpik,
+    // vurgular yok, mevzuat o gunden beri degismis olabilir. Bunu
+    // sessizce gostermek avukatı yanıltır.
+    const t = d.zaman ? new Date(d.zaman).toLocaleString("tr-TR") : "";
+    h += '<div class="kayitli-serit">Kayıtlı cevap' +
+      (t ? " · " + kacis(t) : "") +
+      ' <button id="yenidenSor">yeniden sor</button></div>';
+  }
 
   if (d.guven && d.guven.dusuk) {
     h += '<div class="guven-uyari"><b>Bu konuda külliyatımda yeterli ' +
@@ -866,7 +1410,13 @@ function ciz(d) {
   }
   if (d.kararlar && d.kararlar.length) {
     paneller.push({ ad: "Mahkeme kararları", sayi: d.kararlar.length,
-                    icerik: kararPaneli(d.kararlar) });
+                    icerik: kararPaneli(d.kararlar, d.karar_kaynagi) });
+  }
+  const dosya = acikDosya();
+  if (dosya) {
+    paneller.push({ ad: "Dosyam",
+                    sayi: dosya.maddeler.length + dosya.kararlar.length,
+                    icerik: dosyaPaneli(dosya) });
   }
 
   h += '<div class="sekmeler">';
@@ -933,8 +1483,10 @@ function dayanakPaneli(d) {
           '<span class="ok">▶</span>' +
           '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
           '<span class="madde-baslik">' +
-            maddeEtiketi(m) + "</span>" +
+            maddeEtiketi(m) + maddeOzet(m) + "</span>" +
           rozet +
+          kararSayisiRozeti(m) +
+          isaretDugmesi("madde", maddeKimlik(m)) +
         "</div>" +
         '<div class="madde-govde">' + maddeMetni(m) +
           (m.bolum ? '<div class="madde-dip">' + kacis(m.bolum) + "</div>" : "") +
@@ -971,9 +1523,236 @@ function karsiPaneli(kt) {
 
 // Mahkeme kararlari AYRI sekmede. Maddelerle karistirilmamali: madde
 // baglayici kural, karar ise o kuralin bir olaydaki yorumu.
-function kararPaneli(kararlar) {
+/* Dosyayi DISKE kaydetme ve geri acma.
+
+   NEDEN: tarayici hafizasi (localStorage) tek tarayiciya bagli --
+   baska bilgisayarda, gizli sekmede ya da site verisi temizlenince
+   dosya gitmis oluyor. Diske kaydedilen bir .json ise avukatin kendi
+   dosya klasorunde, dava klasorunun yaninda durur; yedeklenir,
+   e-postayla gonderilir, baska makinede acilir.
+
+   Sunucuya HICBIR SEY gitmiyor: kaydetme de acma da tarayicida
+   yapiliyor. Site tek sifreyle disari acik ve dosyalar sunucuda
+   tutulsa herkes birbirinin dosyasini gorurdu. */
+function dosyaDisaAktar(d) {
+  const veri = JSON.stringify({ surum: 1, dosya: d }, null, 1);
+  const bag = document.createElement("a");
+  const url = URL.createObjectURL(new Blob([veri], { type: "application/json" }));
+  bag.href = url;
+  // Dosya adindaki isaretler dosya sistemini bozabilir.
+  bag.download = (d.ad || "dosya").replace(/[^\p{L}\p{N} _-]/gu, "").trim() + ".aibars.json";
+  document.body.appendChild(bag);
+  bag.click();
+  bag.remove();
+  setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+}
+
+function dosyaIceriAktar(dosyaNesnesi) {
+  const okuyucu = new FileReader();
+  okuyucu.onload = function () {
+    let gelen;
+    try {
+      gelen = JSON.parse(okuyucu.result);
+    } catch (e) {
+      alert("Dosya okunamadı: geçerli bir Aibars dosyası değil.");
+      return;
+    }
+    const d = gelen && gelen.dosya;
+    if (!d || !Array.isArray(d.maddeler) || !Array.isArray(d.kararlar)) {
+      alert("Dosya okunamadı: beklenen alanlar yok.");
+      return;
+    }
+    // Yeni kimlik: ayni dosyayi iki kez acmak birbirini ezmesin.
+    d.id = "d" + Date.now().toString(36);
+    d.sorular = Array.isArray(d.sorular) ? d.sorular : [];
+    dosyalar.dosyalar.unshift(d);
+    dosyalar.acik = d.id;
+    dosyaKaydet();
+    if (sonVeri) ciz(sonVeri);
+  };
+  okuyucu.readAsText(dosyaNesnesi);
+}
+
+function dosyaMetniKopyala(d) {
+  // Dilekceye yapistirmak icin duz metin. JSON degil: avukat bunu
+  // Word'e alacak.
+  const p = [];
+  p.push(d.ad || "Dosya");
+  p.push("=".repeat((d.ad || "Dosya").length));
+  if (d.not_) p.push("\n" + d.not_);
+  if (d.sorular.length) {
+    p.push("\nSORULAR");
+    d.sorular.forEach(function (q) { p.push("  - " + q); });
+  }
+  if (d.maddeler.length) {
+    p.push("\nMADDELER");
+    d.maddeler.forEach(function (m) {
+      p.push("\n" + (m.mevzuat_adi || "") + " m." + m.madde_no +
+             (m.baslik ? " — " + m.baslik : ""));
+      p.push((m.metin || "").trim());
+      if (m.resmi_url) p.push(m.resmi_url);
+    });
+  }
+  if (d.kararlar.length) {
+    p.push("\nKARARLAR");
+    d.kararlar.forEach(function (k) {
+      p.push("\n" + (k.kisa_ad || ""));
+      p.push((k.metin || "").trim());
+    });
+  }
+  const metin = p.join("\n");
+  const bitir = function (ok) {
+    const dugme = document.getElementById("metinKopyala");
+    if (dugme) dugme.textContent = ok ? "Kopyalandı" : "Kopyalanamadı";
+    setTimeout(function () {
+      if (dugme) dugme.textContent = "Metin olarak kopyala";
+    }, 1600);
+  };
+  // navigator.clipboard yalnizca guvenli baglamda (https ya da
+  // localhost) var; duz http bir adreste yok. Eski yontem yedek.
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(metin).then(function () { bitir(true); },
+                                              function () { bitir(false); });
+    return;
+  }
+  const ta = document.createElement("textarea");
+  ta.value = metin;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.select();
+  let ok = false;
+  try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+  ta.remove();
+  bitir(ok);
+}
+
+function dosyaPaneli(d) {
+  // Dosyanin kendisi: toplanan maddeler + kararlar + not.
+  // Bu panel, sistemin "soru-cevap kutusu" olmaktan cikip calisma
+  // masasina donustugu yer -- avukat dilekce yazarken buraya bakar.
+  let h = '<div class="grup-basligi">' + kacis(d.ad) + "</div>" +
+    '<div class="karar-not">Bu dosyada işaretlediğiniz kayıtlar. ' +
+    "Tarayıcınızda saklanır, sunucuya gönderilmez; başka bir " +
+    "bilgisayarda açtığınızda gelmez.</div>";
+
+  h += '<textarea class="dosya-not" id="dosyaNot" rows="3" ' +
+       'placeholder="Bu dosya için notlarınız…">' + kacis(d.not_ || "") +
+       "</textarea>";
+
+  if (!d.maddeler.length && !d.kararlar.length) {
+    return h + '<div class="karar-not">Henüz kayıt yok. Sonuçlardaki ' +
+      "☆ işaretine basarak madde ve karar ekleyebilirsiniz.</div>";
+  }
+
+  if (d.maddeler.length) {
+    h += '<div class="grup-basligi">Maddeler<span class="grup-sayi">' +
+         d.maddeler.length + "</span></div>";
+    d.maddeler.forEach(function (m) {
+      h += '<div class="madde">' +
+        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+          '<span class="ok">▶</span>' +
+          '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
+          '<span class="madde-baslik">' + kacis(m.mevzuat_adi || "") +
+            (m.baslik ? " — " + kacis(m.baslik) : "") + "</span>" +
+          isaretDugmesi("madde", m.kimlik) +
+        "</div>" +
+        '<div class="madde-govde">' + fikralara(m.metin) + "</div></div>";
+    });
+  }
+
+  if (d.kararlar.length) {
+    h += '<div class="grup-basligi">Kararlar<span class="grup-sayi">' +
+         d.kararlar.length + "</span></div>";
+    d.kararlar.forEach(function (kr) {
+      h += '<div class="karar">' +
+        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+          '<span class="ok">▶</span>' +
+          '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
+          isaretDugmesi("karar", kr.kimlik) +
+        "</div>" +
+        '<div class="madde-govde">' + fikralara(kr.metin) + "</div></div>";
+    });
+  }
+
+  h += '<div class="dosya-eylem">' +
+    '<button class="disa-aktar" id="disaAktar">Bilgisayara kaydet</button>' +
+    '<button class="disa-aktar" id="metinKopyala">Metin olarak kopyala</button>' +
+    "</div>";
+  return h;
+}
+
+function kararKarti(kr) {
+  return '<div class="karar">' +
+    '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+      '<span class="ok">▶</span>' +
+      '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
+      (kr.karar_tarihi
+        ? '<span class="karar-tarih">' + kacis(kr.karar_tarihi) + "</span>"
+        : "") +
+      isaretDugmesi("karar", kr.kisa_ad || "") +
+    "</div>" +
+    '<div class="madde-govde">' + fikralara(kr.metin) + "</div></div>";
+}
+
+async function dahaKararGetir(dugme) {
+  // Cevap uretimini TEKRARLAMIYORUZ: yalnizca karar aramasi yapan ayri
+  // bir uc var. Gemini cagrisi yok, vurgu hesabi yok.
+  const soru = (sonVeri && sonVeri.soru) || "";
+  if (!soru) return;
+  const liste = document.getElementById("kararListe");
+  const varolan = [...document.querySelectorAll("#kararListe .karar-ad")]
+    .map(function (x) { return x.textContent; });
+  dugme.disabled = true;
+  dugme.textContent = "Aranıyor…";
+  try {
+    const r = await fetch("api/kararlar", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ soru: soru, adet: 12, haric: varolan }),
+    });
+    if (!r.ok) throw new Error("sunucu " + r.status);
+    const d = await r.json();
+    if (!d.kararlar || !d.kararlar.length) {
+      dugme.textContent = "Başka karar bulunamadı";
+      return;
+    }
+    // Yeni gelenler sonVeri'ye de eklensin ki yildizlama calissin.
+    sonVeri.kararlar = (sonVeri.kararlar || []).concat(d.kararlar);
+    liste.insertAdjacentHTML("beforeend",
+                             d.kararlar.map(kararKarti).join(""));
+    dugme.disabled = false;
+    dugme.textContent = "Daha fazla karar getir";
+  } catch (e) {
+    dugme.disabled = false;
+    dugme.textContent = "Getirilemedi — tekrar dene";
+  }
+}
+
+function kararPaneli(kararlar, kaynak) {
   let h = '<div class="karar-not">Bu kararlar örnek niteliğindedir; ' +
     "bağlayıcı kural dayanak maddelerdir.</div>";
+  // Kararin nereden geldigi avukat icin onemli. Canli katman ana katman
+  // oldugu icin bu bilgi artik neredeyse her cevapta cikiyor; bu yuzden
+  // uyari degil, kucuk bir kaynak etiketi olarak duruyor. Asil dikkat
+  // ceken durum TERSI: canliya ulasilamadiginda elde kalanla cevap
+  // verildigini avukatin bilmesi gerekiyor.
+  if (kaynak === "karma") {
+    h += '<div class="karar-kaynak canli">Yerel arşiv ve canlı Yargıtay ' +
+      "sonuçları birleştirildi; alaka eşitse yeni tarihli olan üstte." +
+      "</div>";
+  } else if (kaynak === "canli") {
+    h += '<div class="karar-kaynak canli">Kararlar Yargıtay sitesinden ' +
+      "canlı getirildi.</div>";
+  } else {
+    // "yerel" artik bir hata degil bir TERCIH: canli sonuc da alindi
+    // ama yerel arsiv bu soruda daha alakali cikti. Olculdu -- is ve
+    // kira hukukunda yerel arsiv canliyi geciyor (kidem tazminati
+    // 0,983'e karsi 0,738).
+    h += '<div class="karar-kaynak">Bu soruda <b>yerel arşiv</b> daha ' +
+      "alakalı sonuç verdi; canlı sonuçlarla karşılaştırıldı.</div>";
+  }
+  h += '<div id="kararListe">';
   kararlar.forEach(function (kr) {
     h += '<div class="karar">' +
       '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
@@ -982,12 +1761,110 @@ function kararPaneli(kararlar) {
         (kr.karar_tarihi
           ? '<span class="karar-tarih">' + kacis(kr.karar_tarihi) + "</span>"
           : "") +
+        isaretDugmesi("karar", kr.kisa_ad || "") +
       "</div>" +
       '<div class="madde-govde">' + fikralara(kr.metin) + "</div></div>";
   });
+  h += "</div>";
+  h += '<button class="daha-karar" id="dahaKarar">Daha fazla karar getir</button>';
   return h;
 }
 
+/* Olay yetkilendirme: kenar cubugu ve isaret dugmeleri her cizimde
+   yeniden uretiliyor, tek tek dinleyici baglamak sizinti demek. */
+document.getElementById("dosyaEkle").onclick = function () {
+  const ad = prompt("Dosya adı — örn. Kiracı tahliye, Ahmet Y.");
+  if (ad === null) return;
+  dosyaYeni(ad.trim() || "Adsız dosya");
+};
+
+document.getElementById("dosyaListe").addEventListener("dblclick", function (e) {
+  // Kendiliginden acilan dosyanin adi ilk sorudan turetiliyor; avukat
+  // "Ahmet Y. tahliye" gibi kendi adini vermek isteyecek.
+  const el = e.target.closest("[data-dosya]");
+  if (!el) return;
+  const d = dosyalar.dosyalar.find(function (x) { return x.id === el.dataset.dosya; });
+  if (!d) return;
+  const ad = prompt("Dosya adı", d.ad);
+  if (ad === null) return;
+  d.ad = ad.trim() || d.ad;
+  dosyaKaydet();
+  if (sonVeri) ciz(sonVeri);      // sekme adi da degissin
+});
+
+document.getElementById("dosyaListe").addEventListener("click", function (e) {
+  const sil = e.target.closest("[data-sil]");
+  if (sil) { e.stopPropagation(); dosyaSil(sil.dataset.sil); return; }
+  const q = e.target.closest("[data-soru]");
+  if (q) {
+    soruEl.value = q.dataset.soru;
+    // Kayitli cevap varsa ANINDA goster. Yeniden sormak 10 saniye
+    // suruyor, bir Gemini cagrisi harciyor ve farkli cevap gelebiliyor;
+    // gecmise tiklamanin beklentisi "gordugum sey geri gelsin".
+    const kayit = kayitliCevap(q.dataset.soru);
+    if (kayit) { ciz(kayit); window.scrollTo({ top: 0, behavior: "smooth" }); }
+    else sor();
+    return;
+  }
+  const d = e.target.closest("[data-dosya]");
+  if (d) {
+    // Ayni dosyaya tekrar tiklamak kapatir: gecmis listesi uzun,
+    // kapatabilmek gerekiyor.
+    dosyalar.acik = dosyalar.acik === d.dataset.dosya ? null : d.dataset.dosya;
+    dosyaKaydet();
+  }
+});
+
+document.getElementById("dosyaAc").onclick = function () {
+  document.getElementById("dosyaGirdi").click();
+};
+document.getElementById("dosyaGirdi").onchange = function (e) {
+  const f = e.target.files && e.target.files[0];
+  if (f) dosyaIceriAktar(f);
+  e.target.value = "";       // ayni dosya tekrar secilebilsin
+};
+
+document.getElementById("cikti").addEventListener("click", function (e) {
+  // Not alani ve dosya dugmeleri de bu panelde
+  if (e.target.id === "dahaKarar") {
+    dahaKararGetir(e.target);
+    return;
+  }
+  if (e.target.id === "yenidenSor") {
+    soruEl.value = (sonVeri && sonVeri.soru) || soruEl.value;
+    sor();
+    return;
+  }
+  if (e.target.id === "disaAktar") {
+    const d = acikDosya();
+    if (d) dosyaDisaAktar(d);
+    return;
+  }
+  if (e.target.id === "metinKopyala") {
+    const d = acikDosya();
+    if (d) dosyaMetniKopyala(d);
+    return;
+  }
+  const b = e.target.closest("[data-isaret]");
+  if (!b) return;
+  // Yildiz madde kartinin BASLIGINDA duruyor; tiklamanin karti acmasini
+  // istemiyoruz.
+  e.stopPropagation();
+  isaretDegistir(b.dataset.isaret, b.dataset.kimlik);
+});
+
+document.getElementById("cikti").addEventListener("input", function (e) {
+  if (e.target.id !== "dosyaNot") return;
+  const d = acikDosya();
+  if (!d) return;
+  d.not_ = e.target.value;
+  // Her tusta diske yazmak yerine kisa bir gecikme: uzun notta
+  // localStorage yazimi yaziyi takiliyor.
+  clearTimeout(window._notZaman);
+  window._notZaman = setTimeout(function () { Depo.yaz(dosyalar); }, 400);
+});
+
+dosyalariCiz();
 durumGuncelle();
 soruEl.focus();
 </script>
