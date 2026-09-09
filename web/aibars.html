@@ -372,18 +372,38 @@
   }
   .marka span { color: var(--vurgu); }
   /* ---------- belge yukleme ve onay ---------- */
-  .belge-satiri {
-    display: flex; align-items: center; gap: 12px;
-    margin: 12px auto 0; max-width: 980px;
+  /* Klasik birakma alani. Once kucuk bir dugmeydi ve arama kutusunun
+     bandi uzerine biniyordu; ayrica "buraya dilekce birak" cagrisini
+     hic vermiyordu. Olculu tutuldu: sayfayi kaplayan bir kutu, soru
+     sormayi ikincil gosterirdi -- oysa iki yol da esit. */
+  .belge-alan {
+    margin: 16px auto 0; max-width: 980px;
+    padding: 18px 20px 16px; text-align: center; cursor: pointer;
+    background: var(--yuzey);
+    border: 1.5px dashed #c6bda2; border-radius: 3px;
+    transition: border-color .15s, background .15s, transform .15s;
   }
-  .belge-ac {
-    font: inherit; font-size: 12.5px; cursor: pointer;
-    padding: 7px 13px; color: var(--metin-orta);
-    background: var(--yuzey); border: 1px solid var(--kenar);
-    border-radius: 2px; box-shadow: 1px 1px 3px var(--golge);
+  .belge-alan:hover, .belge-alan:focus-visible {
+    border-color: var(--vurgu); background: #fdfbf2; outline: none;
   }
-  .belge-ac:hover { border-color: var(--vurgu); color: var(--vurgu); }
-  .belge-not { font-size: 11.5px; color: var(--metin-sol); }
+  .belge-alan.uzerinde {
+    border-color: var(--vurgu); background: var(--vurgu-bg);
+    transform: translateY(-1px);
+  }
+  .belge-simge {
+    width: 26px; height: 26px; color: var(--vurgu);
+    opacity: .75; margin-bottom: 4px;
+  }
+  .belge-baslik {
+    font-family: var(--serif); font-size: 15.5px; font-weight: 600;
+    color: var(--metin);
+  }
+  .belge-alt { font-size: 12.5px; color: var(--metin-orta); margin-top: 3px; }
+  .belge-alt u { text-decoration-color: var(--kenar); }
+  .belge-guvence {
+    font-size: 11px; color: var(--metin-sol); margin-top: 7px;
+    line-height: 1.45;
+  }
 
   .onay-kagit {
     position: relative; background: #fdfaef;
@@ -470,13 +490,13 @@
   .arama { position: relative; }
   /* Bant, ikinci yer: kutu sayfaya yapistirilmis gibi dursun. */
   .arama::before {
-    content: ""; position: absolute; left: -8px; bottom: -8px; z-index: 3;
+    content: ""; position: absolute; right: -8px; top: -8px; z-index: 3;
     width: 54px; height: 15px; pointer-events: none;
     background: rgba(223,210,158,.6);
     border-left: 1px solid rgba(0,0,0,.07);
     border-right: 1px solid rgba(0,0,0,.07);
     box-shadow: 0 1px 2px rgba(0,0,0,.12);
-    transform: rotate(34deg);
+    transform: rotate(38deg);
   }
   #soru {
     width: 100%; padding: 18px 64px 18px 20px;
@@ -1181,10 +1201,19 @@
   <!-- Belge yukleme. Dosya SUNUCUYA degil KENDI BILGISAYARINA gidiyor
        (sunucu zaten avukatin makinesi); metin cikarma ve maskeleme
        orada yapiliyor, disariya ancak onayladigi maskeli metin cikiyor. -->
-  <div class="belge-satiri">
+  <div class="belge-alan" id="belgeAlan" tabindex="0" role="button"
+       aria-label="Belge yükle">
     <input type="file" id="belgeGirdi" accept=".pdf,.txt,.md" hidden>
-    <button class="belge-ac" id="belgeAc">Belge yükle</button>
-    <span class="belge-not">PDF veya TXT · dilekçe, bilirkişi raporu, karar</span>
+    <svg class="belge-simge" viewBox="0 0 24 24" fill="none"
+         stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+         stroke-linejoin="round" aria-hidden="true">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+      <path d="M14 3v5h5"/><path d="M12 18v-6"/><path d="M9.5 14.5 12 12l2.5 2.5"/>
+    </svg>
+    <div class="belge-baslik">Dilekçeyi buraya bırakın</div>
+    <div class="belge-alt">veya <u>bilgisayarınızdan seçin</u> · PDF, TXT</div>
+    <div class="belge-guvence">Belge bilgisayarınızdan çıkmaz;
+      kimlik bilgileri gizlendikten sonra onayınızla gönderilir.</div>
   </div>
 
 
@@ -2408,14 +2437,40 @@ try {
    bellegindeki oturumda kaliyor. */
 let belgeOturum = null;
 
-document.getElementById("belgeAc").onclick = function () {
-  document.getElementById("belgeGirdi").click();
+const belgeAlanEl = document.getElementById("belgeAlan");
+const belgeGirdiEl = document.getElementById("belgeGirdi");
+
+belgeAlanEl.onclick = function () { belgeGirdiEl.click(); };
+belgeAlanEl.onkeydown = function (e) {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); belgeGirdiEl.click(); }
 };
 
-document.getElementById("belgeGirdi").onchange = async function (e) {
+// Surukleyip birakma. dragover'da preventDefault SART: yoksa tarayici
+// dosyayi kendi acar ve sayfadan cikilir.
+["dragenter", "dragover"].forEach(function (olay) {
+  belgeAlanEl.addEventListener(olay, function (e) {
+    e.preventDefault();
+    belgeAlanEl.classList.add("uzerinde");
+  });
+});
+["dragleave", "drop"].forEach(function (olay) {
+  belgeAlanEl.addEventListener(olay, function (e) {
+    e.preventDefault();
+    belgeAlanEl.classList.remove("uzerinde");
+  });
+});
+belgeAlanEl.addEventListener("drop", function (e) {
+  const dosyalar = e.dataTransfer && e.dataTransfer.files;
+  if (dosyalar && dosyalar.length) belgeyiIsle(dosyalar[0]);
+});
+
+belgeGirdiEl.onchange = function (e) {
   const dosya = e.target.files && e.target.files[0];
-  if (!dosya) return;
   e.target.value = "";                       // ayni dosya tekrar secilebilsin
+  if (dosya) belgeyiIsle(dosya);
+};
+
+async function belgeyiIsle(dosya) {
   const gec = konusmaEkle('<div class="yukleniyor"><span class="yuk-metin">' +
     kacis(dosya.name) + " okunuyor</span></div>", "gecici");
   blogaKaydir(gec);
@@ -2432,7 +2487,7 @@ document.getElementById("belgeGirdi").onchange = async function (e) {
     konusmaEkle('<div class="hata">Belge okunamadı.<code>' +
       kacis(hata.message) + "</code></div>", "gecici");
   }
-};
+}
 
 function belgeCiz(d, dosyaAdi) {
   belgeOturum = d.oturum;
