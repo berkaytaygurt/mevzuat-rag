@@ -16,19 +16,46 @@
      (#d9897a) -- gri zeminde turuncu bir tabela gibi parliyordu.
      Simdi zemin serin ve koyu, vurgu DOYGUNLUGU DUSUK celik mavisi.
      Renk dikkat cekmek icin degil, ayirt etmek icin var. */
+  /* DEFTER TEMASI. Zemin cizgili kagit, sonuclar uzerine yapistirilmis
+     not kagitlari. Duz surum web/aibars_duz.html'de duruyor.
+
+     Renkler kagit tonlarindan seciliyor: krem zemin, soluk mavi
+     cizgi, kenarda kirmizi marj. Vurgu mavi kalem rengi -- parlak
+     degil, tukenmez kalem gibi. */
   :root {
-    --bg:        #f2f4f6;
-    --yuzey:     #ffffff;
-    --yuzey-alt: #eaedf0;
-    --kenar:     #d5dae0;
-    --kenar-ince:#e5e9ed;
-    --metin:     #171a1d;
-    --metin-orta:#4c545c;
-    --metin-sol: #7c858e;
-    --vurgu:     #2d4f7c;
-    --vurgu-bg:  #e8eef6;
-    --uyari:     #7a5a1e;
-    --uyari-bg:  #f5efe1;
+    --bg:        #f7f3e7;
+    --yuzey:     #fdfaef;
+    --yuzey-alt: #f1ecdd;
+    --kenar:     #ddd6c0;
+    --kenar-ince:#e9e3d2;
+    --metin:     #1d1c18;
+    --metin-orta:#4d4a41;
+    --metin-sol: #857f70;
+    --vurgu:     #1f3d6b;
+    --vurgu-bg:  #e9eef7;
+    --uyari:     #8a5a1e;
+    --uyari-bg:  #f7efdd;
+    /* Defter ogeleri */
+    --cizgi:     #d2d9dd;
+    --marj:      #e0b7af;
+    /* Gercek post-it renkleri. Ilk denemede cok soluktular
+       (#fdf6c9 gibi) ve "yapistirilmis kagit" hissi vermiyordu --
+       sayfayla ayni tonda kalip kaybolan renkli dikdortgenler oldu.
+       Bunlar doygun ama uzerinde koyu metin hala okunuyor. */
+    /* Doygunluk kisildi. Parlak surumde renk yaniltiyordu: gozu
+       yoran sey rengin kendisi degil, KAPLADIGI ALAN. Notlar sayfayi
+       bastan sona kapladigi icin ekranin yarisi doygun renk oluyordu.
+       Hem renk yumusatildi hem not daraltildi. */
+    --not-sari:  #fbf0a8;
+    --not-mavi:  #bfe6f2;
+    --not-yesil: #d2eec4;
+    --not-pembe: #f9ccd9;
+    --not-turuncu:#fadcb4;
+    --not-mor:   #ded0f2;
+    --golge:     rgba(60, 50, 30, .16);
+    /* Defter satir yuksekligi. Metnin line-height'i buna ESIT olmali,
+       yoksa yazi cizgilerin arasinda yuzuyor. */
+    --satir:     32px;
     /* KANUN METNI icin serif. Onceki listede "Iowan Old Style" basta
        geliyordu; o yalnizca Mac'te var ve Windows'ta Palatino Linotype'a
        dusuyordu -- zarif ama ekranda ince, dusuk kontrastli, uzun
@@ -41,31 +68,68 @@
     --serif:     Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, "Times New Roman", serif;
     --sans:      -apple-system, BlinkMacSystemFont, "Segoe UI", "Inter", Roboto, "Helvetica Neue", Arial, sans-serif;
     --mono:      ui-monospace, "Cascadia Mono", Consolas, monospace;
+    /* DAKTILO. Yalnizca kunye ve numaralarda kullaniliyor: madde no,
+       daire, esas/karar numarasi, tarih. Uzun metinde denenmedi bile --
+       daktilo yazisi sabit genislikli, hukum metni gibi uzun paragraflari
+       gozle taramayi yavaslatir ve ekranda cabuk yorar. Kunyede ise hem
+       gercekci (mahkeme evraki daktiloyla yazilir) hem ise yarar:
+       rakamlar alt alta hizalaniyor. */
+    --daktilo:   "Courier New", "Nimbus Mono PS", "Cascadia Mono", monospace;
   }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg:#171a1d; --yuzey:#1e2226; --yuzey-alt:#23282d;
-      --kenar:#2f353b; --kenar-ince:#252a2f;
-      --metin:#dde2e7; --metin-orta:#98a1aa; --metin-sol:#6d757d;
-      --vurgu:#8fadd0; --vurgu-bg:#1c2530;
-      --uyari:#b3986a; --uyari-bg:#241f16;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg:#171a1d; --yuzey:#1e2226; --yuzey-alt:#23282d; --kenar:#2f353b;
-    --kenar-ince:#252a2f; --metin:#dde2e7; --metin-orta:#98a1aa;
-    --metin-sol:#6d757d; --vurgu:#8fadd0; --vurgu-bg:#1c2530;
-    --uyari:#b3986a; --uyari-bg:#241f16;
-  }
+  /* KOYU TEMA YOK. Defter teması kağıt demek; karanlık kağıt olmaz.
+     Koyu sürümde post-it renkleri kısılıyor, çizgiler kayboluyor ve
+     ekranda gri kutular kalıyordu -- temanın bütün anlamı gidiyordu.
+     Düz sürüm (web/aibars_duz.html) koyu temayı destekliyor. */
+  :root { color-scheme: light; }
 
   * { box-sizing: border-box; }
   html { -webkit-text-size-adjust: 100%; }
+  /* ---------- ÇİZGİLİ KAĞIT ZEMİN ----------
+     Yatay çizgiler 28px aralıkla; satır yüksekliğiyle uyumlu olsun
+     diye bu değer seçildi, yoksa metin çizgilerin üstünde yüzüyor.
+     background-attachment: local -- sayfa kaydırılınca çizgiler de
+     kayar, sabit kalırsa kağıt hissi bozuluyor. */
+  /* Govde MASA: duz, cizgisiz. Cizgili kagit .kabuk'ta -- boylece
+     sayfa masaya konmus bir defter yapragi gibi duruyor ve
+     kaydirinca cizgiler bitmiyor.
+     (Ilk denemede cizgiler govdeye konmustu; background-attachment
+     local govdenin boyanan alaniyla sinirli kaldigi icin asagi
+     kaydirinca cizgisiz bos bant cikiyordu.) */
   body {
-    margin: 0; background: var(--bg); color: var(--metin);
-    font-family: var(--sans); font-size: 16px; line-height: 1.6;
+    margin: 0; color: var(--metin);
+    background-color: var(--yuzey-alt);
+    font-family: var(--sans); font-size: 16px; font-weight: 420;
+    /* Cizgiye hizalama: satir yuksekligi defter araligiyla AYNI.
+       1.6 gibi oransal deger verilirse yazi cizgilerin arasinda
+       yuzuyor ve defter hissi kayboluyor. */
+    line-height: var(--satir);
     -webkit-font-smoothing: antialiased;
   }
-  .kabuk { max-width: 720px; margin: 0 auto; padding: 0 24px 96px; }
+  .kabuk {
+    max-width: none; width: 100%; margin: 0; padding: 22px 0 96px 0;
+    position: relative;
+    background-color: var(--bg);
+    background-image: repeating-linear-gradient(
+      to bottom,
+      transparent 0, transparent calc(var(--satir) - 1px),
+      var(--cizgi) calc(var(--satir) - 1px), var(--cizgi) var(--satir));
+    box-shadow: 0 0 18px var(--golge);
+    min-height: 100vh;
+  }
+  /* Defterin kirmizi marj cizgisi. Gercek deftede solda tek cizgi
+     vardir; burada da metin sutununun solunda duruyor. */
+  .kabuk::before {
+    content: ""; position: absolute; top: 0; bottom: 0; left: 46px;
+    border-left: 1px solid var(--marj); opacity: .6;
+  }
+  /* KAGIT tam genislikte ama YAZI degil. Metin sayfanin ucundan
+     ucuna uzayinca satirlar 150+ karaktere cikiyor ve goz satir
+     basini kaybediyor. Gercek deftere de marjdan baslanir ve sagda
+     bosluk birakilir. */
+  /* Icerik ortalanir. Onceden marjdan 78px sonra basliyordu ve genis
+     ekranda her sey sola yapisik duruyordu. */
+  .kabuk > * { max-width: 980px; margin-left: auto; margin-right: auto; }
+  @media (max-width: 900px) { .kabuk::before { display: none; } }
 
   /* ---------- dosya kenar cubugu ----------
      NEDEN: sistem soru-cevap kutusuydu, her soru sifirdan basliyordu.
@@ -86,31 +150,160 @@
        seridi) fark etmiyor ama ekranin solunda 250 piksellik bir blok
        olunca goz onu ORTAM rengi saniyor ve butun sayfa yesile
        calisiyor. Palet degismedi; degisen sey o tonun kapladigi alan. */
-    border-right: 1px solid var(--kenar-ince); background: var(--bg);
+    border-right: 1px solid #b9a887;
+    /* Ahsap raf. Belirgin mese/ceviz tonu denendi ve geri alindi:
+       250 piksellik koyu bir blok, kremi sayfanin yaninda leke gibi
+       duruyordu. Bu ton sayfanin kendi krem ailesinden, yalnizca iki
+       basamak koyu -- goz "ahsap" diyor ama dikkati cekmiyor. */
+    background:
+      repeating-linear-gradient(to right,
+        rgba(122, 96, 58, .055) 0 1px,
+        rgba(255, 255, 255, .035) 1px 3px,
+        transparent 3px 9px),
+      linear-gradient(to bottom, #e7dfcb, #ded6c0);
+    box-shadow: inset -7px 0 12px -9px rgba(60, 45, 20, .45);
     display: flex; flex-direction: column; overflow: hidden;
   }
   .kenar-bas {
-    padding: 18px 16px 12px; display: flex; align-items: center;
-    justify-content: space-between; gap: 8px;
+    padding: 18px 12px 12px; display: flex; align-items: center;
+    justify-content: space-between; gap: 7px;
   }
+  /* Rafa BANTLANMIS kagit etiket: ahsabin uzerinde duran yaziyi
+     kagida almak iki yakayi da birbirine bagliyor. */
   .kenar-bas h2 {
-    margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .09em;
-    text-transform: uppercase; color: var(--metin-sol);
+    position: relative;
+    margin: 0; padding: 4px 9px 5px;
+    background: var(--yuzey);
+    font-size: 10.5px; font-weight: 600; letter-spacing: .05em;
+    text-transform: uppercase; color: #46535e;
+    box-shadow: 1px 1px 3px rgba(60,50,30,.26);
+    transform: rotate(-1.2deg);
+  }
+  .kenar-bas h2::after {
+    content: ""; position: absolute; left: -9px; top: -5px;
+    width: 26px; height: 12px;
+    background: rgba(223,210,158,.66);
+    border-left: 1px solid rgba(0,0,0,.07);
+    border-right: 1px solid rgba(0,0,0,.07);
+    transform: rotate(-26deg);
   }
   .kenar-ekle {
     border: 1px solid var(--kenar); background: var(--yuzey);
     color: var(--metin-orta); border-radius: 4px; cursor: pointer;
-    font: inherit; font-size: 12px; line-height: 1; padding: 5px 9px;
+    font: inherit; font-size: 12px; line-height: 1; padding: 5px 8px;
+    white-space: nowrap;
   }
   .kenar-ekle:hover { border-color: var(--vurgu); color: var(--vurgu); }
-  .kenar-liste { overflow-y: auto; padding: 0 8px 16px; flex: 1; }
-  .dosya {
-    padding: 9px 10px; border-radius: 4px; cursor: pointer;
-    display: flex; align-items: center; gap: 8px; font-size: 14px;
-    color: var(--metin-orta);
+  .kenar-liste {
+    overflow-y: auto; overflow-x: hidden;
+    padding: 0 18px 16px 8px; flex: 1;
+    /* Her klasor bir RAF TAHTASI uzerinde duruyor. Tahtalar listenin
+       ARKA PLANINDA cizili; .dosya::after ile klasore baglansaydi
+       uzerine gelince klasorle birlikte kayar, raf oynardi.
+       Desenin adimi = klasor yuksekligi (54) + bosluk (14) = 68px.
+       .dosya'nin margin-bottom degeri degisirse burasi da degismeli.
+       local: tahtalar liste kaydirilinca klasorlerle birlikte gitsin;
+       scroll birakilirsa tahtalar sabit kalip klasorler uzerinden
+       geciyor. */
+    background-image: repeating-linear-gradient(to bottom,
+      transparent 0 53px,
+      rgba(60, 45, 20, .22) 53px 54px,
+      #cdbc9b 54px 60px,
+      rgba(255, 255, 255, .34) 60px 61px,
+      #b09c78 61px 63px,
+      rgba(60, 45, 20, .15) 63px 65px,
+      transparent 65px 68px);
+    background-attachment: local;
   }
-  .dosya:hover { background: var(--yuzey); }
-  .dosya.secili { background: var(--yuzey); color: var(--metin); font-weight: 500; }
+  /* Panel acma/kapama. Dolabin kapagi gibi: kapaninca icerik
+     genisliyor, kenarda ince bir kulp kaliyor. */
+  .kenar-kapat, .kenar-ac {
+    border: 1px solid #8a949c; background: #e3e7ea; color: #3b4650;
+    border-radius: 4px; cursor: pointer; font: inherit; font-size: 15px;
+    line-height: 1; padding: 5px 9px;
+  }
+  .kenar-kapat:hover, .kenar-ac:hover { background: #f2f5f7; }
+  .kenar-ac {
+    position: fixed; left: 0; top: 14px; z-index: 20;
+    border-left: 0; border-radius: 0 5px 5px 0; padding: 10px 7px;
+    box-shadow: 2px 2px 6px rgba(0,0,0,.22);
+  }
+  .uygulama.kenar-kapali .kenar { display: none; }
+  /* ---------- DOSYA SIRTI ----------
+     Sohbetler dolapta duran renkli dosyalar gibi: her birinin solunda
+     renk seridi, ust uste dizilmis, secili olan one cikmis. */
+  /* ---------- KLASOR SIRTI ----------
+     Mavi klasor, uzerinde beyaz etiket, etikette yazi. Secili olan
+     raftan cekilmis gibi disari kayiyor. */
+  /* ---------- KLASOR SIRTI ----------
+     Gercek dosya klasoru gibi: renkli govde, ortasinda beyaz etiket
+     seridi, sagda metal parmak deligi. Ust ve alt kenarda koyu cizgi
+     (klasorun kartonu). Onceki hal yuvarlak koseli mavi dikdortgendi
+     ve dugmeye benziyordu, klasore degil. */
+  .dosya {
+    position: relative;
+    height: 54px;
+    padding: 0 52px 0 14px;
+    border-radius: 2px;
+    cursor: pointer;
+    display: flex; align-items: center;
+    background: linear-gradient(to bottom,
+      rgba(255,255,255,.30) 0%, rgba(255,255,255,.06) 14%,
+      rgba(0,0,0,.02) 78%, rgba(0,0,0,.16) 100%), #3f7cb0;
+    border-top: 1px solid rgba(255,255,255,.30);
+    border-bottom: 2px solid rgba(0,0,0,.30);
+    box-shadow: 2px 3px 6px rgba(0,0,0,.32);
+    margin-bottom: 14px;   /* 54 + 14 = raf deseninin adimi */
+    transition: transform .2s cubic-bezier(.2,.8,.3,1),
+                box-shadow .2s ease;
+  }
+  /* Klasor renkleri: fotograftaki gibi mavi ve kirmizi karisik */
+  .dosya:nth-child(4n+1) { background-color: #3f7cb0; }
+  .dosya:nth-child(4n+2) { background-color: #b8452f; }
+  .dosya:nth-child(4n+3) { background-color: #2f6288; }
+  .dosya:nth-child(4n)   { background-color: #c1573a; }
+
+  /* Metal parmak deligi */
+  .dosya::before {
+    content: ""; position: absolute; right: 16px; top: 50%;
+    width: 15px; height: 15px; margin-top: -7px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 35% 30%, #6b7076, #23272b 70%);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.8),
+                0 1px 0 rgba(255,255,255,.25);
+  }
+  /* Beyaz etiket seridi */
+  .dosya .dosya-ad {
+    flex: 1; min-width: 0;
+    background: #faf7ea;
+    color: #22292f;
+    padding: 7px 9px;
+    border: 1px solid rgba(0,0,0,.28);
+    border-radius: 1px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.22);
+    font-size: 12.5px; line-height: 1.25;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .dosya .dosya-sayi {
+    position: absolute; right: 34px; top: 50%;
+    transform: translateY(-50%);
+    color: rgba(255,255,255,.85); font-size: 11px; font-weight: 600;
+  }
+  .dosya .dosya-sil {
+    position: absolute; right: 2px; top: 0;
+    color: rgba(255,255,255,.9); font-size: 13px;
+  }
+  .dosya:hover {
+    transform: translateX(5px);
+    box-shadow: 6px 4px 10px rgba(0,0,0,.36);
+  }
+  /* Secili klasor raftan cekilmis */
+  .dosya.secili {
+    transform: translateX(10px);
+    box-shadow: 10px 5px 16px rgba(0,0,0,.42);
+  }
+  .dosya.secili .dosya-ad { font-weight: 650; }
+
   .dosya-ad { flex: 1; min-width: 0; overflow: hidden;
               text-overflow: ellipsis; white-space: nowrap; }
   .dosya-sayi {
@@ -123,14 +316,9 @@
   }
   .dosya:hover .dosya-sil { visibility: visible; }
   .dosya-sil:hover { color: var(--vurgu); }
-  .kenar-gecmis { padding: 2px 0 6px 18px; }
-  .gecmis-soru {
-    display: block; width: 100%; text-align: left; border: 0; background: none;
-    font: inherit; font-size: 12.5px; color: var(--metin-sol);
-    padding: 5px 8px; border-radius: 4px; cursor: pointer;
-    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  .kenar-bos {
+    padding: 10px 8px; font-size: 12px; color: var(--metin-sol);
   }
-  .gecmis-soru:hover { background: var(--yuzey); color: var(--metin-orta); }
 
   /* Dar ekranda kenar cubugu ustte yatay serit olur; cekmece yapmak
      iki ayri etkilesim modeli demek, tek moda sadik kaliyoruz. */
@@ -140,21 +328,66 @@
       position: static; width: auto; height: auto; border-right: 0;
       border-bottom: 1px solid var(--kenar-ince);
     }
-    .kenar-liste { display: flex; gap: 6px; overflow-x: auto; padding: 0 12px 12px; }
-    .kenar-gecmis { display: none; }
+    .kenar-liste { display: flex; gap: 6px; overflow-x: auto;
+                   padding: 0 12px 12px; background-image: none; }
     .dosya { flex: none; }
   }
 
-  /* ---------- üst bant ---------- */
-  header {
-    padding: 40px 0 34px; display: flex;
-    align-items: center; justify-content: space-between; gap: 16px;
+  /* Akistaki her soru-cevap bir halka. Aralarinda ayirici cizgi YOK:
+     her halka zaten kendi yirtik kagidiyla geliyor, ustune bir de
+     cizgi koymak sayfayi bolar. */
+  .konusma + .konusma { margin-top: 6px; }
+
+  /* ---------- ust kagit ---------- */
+  .ust-kagit {
+    /* SABIT DEGIL. Bir sure "position: sticky; top: 0" denendi:
+       kaydirirken metnin ustunde duran serit okumayi boluyordu.
+       z-index yalnizca Ayarlar kutusu icin: kagit DOM'da erken
+       geldigi icin, konumlandirilmis post-it'ler onun onune
+       geciyor ve acilan kutuyu ortuyordu. */
+    position: relative; z-index: 30;
+    margin: 0 auto 30px; padding: 15px 22px 14px;
+    background: #fdfaef;
+    box-shadow: 0 1px 2px rgba(0,0,0,.14),
+                0 10px 16px -10px rgba(0,0,0,.36);
+  }
+  /* Iki bant: yaprak sayfaya yapistirilmis gorunsun */
+  .ust-kagit::before, .ust-kagit::after {
+    content: ""; position: absolute; bottom: -9px;
+    width: 64px; height: 18px;
+    background: rgba(223,210,158,.5);
+    border-left: 1px solid rgba(0,0,0,.07);
+    border-right: 1px solid rgba(0,0,0,.07);
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+  }
+  .ust-kagit::before { left: 40px; transform: rotate(-2.5deg); }
+  .ust-kagit::after { right: 40px; transform: rotate(2deg); }
+  .ust-bas {
+    display: flex; align-items: center;
+    justify-content: space-between; gap: 16px;
   }
   .marka {
-    font-family: var(--serif); font-size: 27px; font-weight: 600;
+    font-family: var(--serif); font-size: 25px; font-weight: 600;
     letter-spacing: -.015em; line-height: 1;
   }
   .marka span { color: var(--vurgu); }
+  .ipucu-satiri {
+    margin-top: 12px; padding-top: 11px;
+    border-top: 1px solid var(--kenar-ince);
+  }
+  .ipucu-satiri p { margin: 0; }
+  .ipucu-satiri b { color: var(--metin); font-weight: 650; }
+  .ipucu-satiri .ipucu {
+    font-size: 12px; line-height: 1.55; color: var(--metin-orta);
+  }
+  /* Kucuk yazi. Rengi --metin-sol degil: o ton bu boyutta 3,6:1
+     kontrast veriyor ve okunmuyor; bu ton 5,2:1 -- kucuk metin icin
+     esigin ustunde. Kucultmek okunmaz yapmak demek degil. */
+  .ipucu-satiri .kucuk-yazi {
+    margin-top: 8px; padding-top: 8px;
+    border-top: 1px solid var(--kenar-ince);
+    font-size: 10.5px; line-height: 1.5; color: #6b665a;
+  }
   .durum {
     font-size: 12px; color: var(--metin-sol); font-variant-numeric: tabular-nums;
     display: flex; align-items: center; gap: 7px;
@@ -170,11 +403,22 @@
 
   /* ---------- arama ---------- */
   .arama { position: relative; }
+  /* Bant, ikinci yer: kutu sayfaya yapistirilmis gibi dursun. */
+  .arama::before {
+    content: ""; position: absolute; left: -8px; bottom: -8px; z-index: 3;
+    width: 54px; height: 15px; pointer-events: none;
+    background: rgba(223,210,158,.6);
+    border-left: 1px solid rgba(0,0,0,.07);
+    border-right: 1px solid rgba(0,0,0,.07);
+    box-shadow: 0 1px 2px rgba(0,0,0,.12);
+    transform: rotate(34deg);
+  }
   #soru {
     width: 100%; padding: 18px 64px 18px 20px;
     font-family: var(--sans); font-size: 17px; color: var(--metin);
     background: var(--yuzey); border: 1px solid var(--kenar);
-    border-radius: 5px; resize: none; min-height: 60px; max-height: 220px;
+    border-radius: 2px; resize: none; min-height: 60px; max-height: 220px;
+    box-shadow: 1px 2px 6px var(--golge);
     /* hidden: kutu icerige gore buyudugu icin kaydirma cubuguna gerek yok.
        auto birakildiginda cubuk cikip gonder tusunun ustune biniyordu.
        Yalnizca max-height'a ulasinca (JS ile) auto'ya cevriliyor. */
@@ -199,7 +443,8 @@
   #gonder:disabled { opacity: .35; cursor: default; }
 
   /* ---------- ayarlar (gizli) ---------- */
-  .ayar-satiri { margin-top: 14px; }
+  .basli-sag { display: flex; align-items: center; gap: 14px; position: relative; }
+  .ayar-satiri { position: relative; }
   #ayarAc {
     background: none; border: none; padding: 0; cursor: pointer;
     font-family: var(--sans); font-size: 12.5px; color: var(--metin-sol);
@@ -207,11 +452,13 @@
   }
   #ayarAc:hover { color: var(--metin-orta); }
   #ayarlar {
-    display: none; margin-top: 12px; padding: 14px 16px;
-    background: var(--yuzey-alt); border-radius: 4px;
+    display: none; position: absolute; right: 0; top: calc(100% + 12px);
+    width: 300px; padding: 14px 16px; z-index: 5;
+    background: #fdfaef; border: 1px solid var(--kenar);
+    box-shadow: 0 10px 20px -8px rgba(0,0,0,.42);
     font-size: 13.5px; color: var(--metin-orta);
   }
-  #ayarlar.acik { display: flex; gap: 20px; flex-wrap: wrap; align-items: center; }
+  #ayarlar.acik { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   #ayarlar label { display: flex; align-items: center; gap: 7px; cursor: pointer; }
   #ayarlar input[type=checkbox] { accent-color: var(--vurgu); cursor: pointer; }
   #ayarlar select {
@@ -223,10 +470,21 @@
   /* ---------- çıktı ---------- */
   #cikti { margin-top: 40px; }
 
+  /* FOSFORLU KALEM. %22 saydamliktaydi ve gövde beyaza cevrilince
+     neredeyse gorunmez oldu -- "vurguyu kaldirmissin" denildi, oysa
+     duruyordu, sadece okunmuyordu. Simdi gercek fosforlu kalem gibi:
+     dogru sari, hafif egik kenarlar (elle cizilmis izlenimi). */
   mark.vurgu {
-    background: rgba(230, 190, 90, .22);
-    border-bottom: 2px solid rgba(230, 190, 90, .55);
-    color: inherit; padding: 1px 0; border-radius: 2px;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 235, 60, .0) 6%,
+      rgba(255, 226, 60, .72) 6%,
+      rgba(255, 226, 60, .72) 92%,
+      rgba(255, 235, 60, .0) 92%);
+    border-bottom: 0;
+    color: inherit; padding: 2px 1px; border-radius: 1px;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
   }
   .vurgu-not {
     font-size: 11.5px; opacity: .65; margin-top: 6px; font-style: italic;
@@ -244,14 +502,18 @@
     border-left: 3px solid #b8873a; background: rgba(184,135,58,.12);
   }
   .anlasilan {
-    margin: 8px 0 2px; padding: 8px 12px; border-radius: 4px;
+    margin: 10px 0 4px; padding: 13px 16px; border-radius: 3px;
+    font-size: 15px; font-weight: 450; line-height: 1.5;
     font-size: 12.5px; line-height: 1.5;
     background: rgba(120,130,160,.10);
     border-left: 3px solid #6b7a99;
   }
   .anlasilan b { font-weight: 600; }
   .anlasilan i { opacity: .8; font-style: normal; }
-  .daire-dagilim { font-size: 11.5px; opacity: .75; margin-bottom: 5px; }
+  .daire-dagilim {
+    font-family: var(--daktilo); font-size: 11.5px;
+    opacity: .75; margin-bottom: 5px;
+  }
   .dogrulama {
     margin: 10px 0 4px; padding: 9px 12px; border-radius: 4px;
     font-size: 12.5px; line-height: 1.5;
@@ -281,7 +543,10 @@
     font-size: 11.5px; opacity: .78; line-height: 1.5;
     padding: 3px 0 6px 12px; font-style: italic;
   }
-  .yorum-satir { padding: 2px 0 2px 10px; border-left: 2px solid var(--kenar); margin-bottom: 3px; }
+  .yorum-satir {
+    padding: 2px 0 2px 10px; border-left: 2px solid var(--kenar);
+    margin-bottom: 3px; font-family: var(--daktilo); font-size: 12px;
+  }
   /* Karar da kart degil satir. Eski kural TANIMSIZ degiskenler
      kullaniyordu (--cizgi, --kart): gecersiz var() yuzunden kenarlik
      rengi metin rengine dusuyordu. Ustelik #8b6f47 sabit kahverengi
@@ -291,8 +556,14 @@
     border-radius: 6px; margin-bottom: 6px; overflow: hidden;
   }
   .karar.acik { border-color: var(--kenar); }
-  .karar-ad { font-weight: 600; font-size: 14px; }
-  .karar-tarih { margin-left: auto; font-size: 12px; opacity: .6; }
+  .karar-ad {
+    font-family: var(--daktilo); font-weight: 700; font-size: 13px;
+    letter-spacing: -.01em;
+  }
+  .karar-tarih {
+    margin-left: auto; font-family: var(--daktilo);
+    font-size: 11.5px; opacity: .7;
+  }
   .karar-not {
     font-size: 12px; opacity: .7; margin: -6px 0 10px 2px;
   }
@@ -308,10 +579,14 @@
     background: var(--yuzey-alt); border-left-color: var(--kenar);
     color: var(--metin-sol);
   }
+  /* Cevap defterin kendi sayfasina yazilmis gibi: kart yok, yalnizca
+     kenarda kalem cizgisi. Not kagitlarindan AYRILMASI onemli --
+     cevap bizim yorumumuz, notlar kaynak. */
   .cevap {
-    font-family: var(--serif); font-size: 18px; line-height: 1.75;
+    font-family: var(--serif); font-size: 18px;
+    line-height: var(--satir);
     color: var(--metin); white-space: pre-wrap;
-    padding-left: 20px; border-left: 2px solid var(--vurgu);
+    padding-left: 20px; border-left: 2px solid var(--marj);
     margin-bottom: 44px;
   }
 
@@ -325,6 +600,7 @@
   /* ---------- kanun grubu ---------- */
   .grup { margin-bottom: 26px; }
   .grup-basligi {
+    background: var(--bg);
     display: flex; align-items: baseline; gap: 9px;
     font-size: 12.5px; font-weight: 700; letter-spacing: .04em;
     text-transform: uppercase; color: var(--metin-orta);
@@ -353,11 +629,76 @@
      bir listeye donuyor, hangi ozetin hangi maddeye ait oldugu
      kayboluyordu. Kutu kalsin ama SESSIZ olsun -- golge yok, kalin
      kenarlik yok, kucuk yaricap. */
+  /* ---------- YAPIŞTIRILMIŞ NOT ----------
+     Her madde bir not kağıdı: hafif eğik, gölgeli, köşesi kıvrık
+     değil ama düz de değil. Eğim ÇOK KÜÇÜK (0,3-0,5 derece) --
+     büyütünce oyuncak gibi duruyor ve okumayı zorlaştırıyor. */
+  /* ---------- GERÇEK POST-IT ----------
+     Kenarlik YOK (post-it'in kenarligi olmaz), kose yuvarlagi YOK,
+     golge iki katmanli: yapiskan ustte sikisik, alt kenar kagittan
+     kalkik. Egim 1-1.5 derece -- ilk denemede 0,35 dereceydi ve
+     hicbir sey hissettirmiyordu.
+
+     Ust kenardaki koyu serit yapiskan bandin izi. */
   .madde {
-    background: var(--yuzey); border: 1px solid var(--kenar-ince);
-    border-radius: 6px; margin-bottom: 6px; overflow: hidden;
+    position: relative;
+    background: var(--not-sari);
+    border: 0;
+    border-radius: 0;
+    /* Not sayfanin TAMAMINI kaplamiyor: gercek post-it de sayfadan
+       dardir. Her biri biraz farkli yerden yapistirilmis gibi
+       kaydiriliyor. */
+    max-width: 660px;
+    margin-bottom: 26px;
+    box-shadow:
+      0 1px 2px rgba(0,0,0,.18),
+      0 10px 18px -10px rgba(0,0,0,.42);
+    transform: rotate(-1.1deg);
+    transition: box-shadow .14s ease;
   }
-  .madde.acik { border-color: var(--kenar); }
+  /* Yapiskan bant izi: ustte hafif koyu bir bant */
+  .madde::before {
+    content: ""; position: absolute; left: 0; right: 0; top: 0;
+    height: 26px; pointer-events: none;
+    background: linear-gradient(to bottom,
+                rgba(0,0,0,.06), rgba(0,0,0,0));
+  }
+  /* KALKIK KOSE. Sag alt kosede sayfa renginde bir ucgen; ustune
+     ice dogru golge dusurulunce kagit oradan kivrilmis gibi
+     goruniyor. Gercek post-it'in en belirgin ozelligi bu. */
+  .madde::after, .karar::after {
+    content: ""; position: absolute; right: 0; bottom: 0;
+    width: 0; height: 0; pointer-events: none;
+    border-style: solid; border-width: 0 0 26px 26px;
+    border-color: transparent transparent var(--bg) transparent;
+    filter: drop-shadow(-3px -3px 4px rgba(0,0,0,.28));
+  }
+  /* Renk ve egim SINIFLA veriliyor, nth-child ile degil: maddeler
+     kanun gruplarina bolunmus durumda ve her grubun basinda bir
+     baslik div'i var. nth-child onu da saydigi icin her grubun ilk
+     maddesi hep ayni siraya dusuyor ve HEPSI AYNI RENK cikiyordu. */
+  .madde.n1 { background: var(--not-sari);    transform: rotate(-1.1deg); margin-left: 4px; }
+  .madde.n2 { background: var(--not-mavi);    transform: rotate(0.9deg);  margin-left: 26px; }
+  .madde.n3 { background: var(--not-yesil);   transform: rotate(-0.6deg); margin-left: 12px; }
+  .madde.n4 { background: var(--not-pembe);   transform: rotate(1.3deg);  margin-left: 34px; }
+  .madde.n5 { background: var(--not-turuncu); transform: rotate(-1.4deg); margin-left: 0; }
+  .madde.n6 { background: var(--not-mor);     transform: rotate(0.7deg);  margin-left: 20px; }
+  .madde:hover {
+    /* Uzerine gelince DONDURMUYORUZ. Onceden aci sifira gidiyordu ve
+       liste boyunca gezerken notlar surekli oynuyordu -- rahatsiz
+       ediciydi. Yalnizca golge derinlesiyor. */
+    box-shadow:
+      0 2px 3px rgba(0,0,0,.16),
+      0 14px 22px -10px rgba(0,0,0,.38);
+    z-index: 2;
+  }
+  .madde.acik {
+    transform: rotate(0deg);
+    box-shadow:
+      0 2px 3px rgba(0,0,0,.16),
+      0 16px 26px -10px rgba(0,0,0,.40);
+    z-index: 2;
+  }
   .madde-bas {
     padding: 12px 16px; cursor: pointer; display: flex;
     /* Satir artik iki satirli (baslik + ozet): ortalamak yerine ustten
@@ -369,8 +710,9 @@
   .madde-bas:hover { background: var(--yuzey-alt); }
   .madde-no {
     flex: none; min-width: 62px;
+    font-family: var(--daktilo);
     font-size: 12.5px; font-weight: 700; color: var(--vurgu);
-    font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
   }
   .madde-baslik {
     flex: 1; min-width: 0;
@@ -382,11 +724,14 @@
   .madde-ozet {
     display: block; margin-top: 3px;
     font-family: var(--sans); font-size: 13px; font-weight: 400;
-    line-height: 1.45; color: var(--metin-sol);
+    line-height: var(--satir);
+    /* Not kagidi doygun renkli; acik gri (--metin-sol) uzerinde
+       okunmuyor. Yari saydam siyah her renkte calisiyor. */
+    color: rgba(30, 26, 18, .72);
   }
   .madde.acik .madde-ozet { display: none; }   /* acikken govde zaten var */
   .ok {
-    flex: none; font-size: 10px; color: var(--metin-sol);
+    flex: none; font-size: 10px; color: rgba(30,26,18,.55);
     transition: transform .18s;
   }
   /* Dosyaya ekleme yildizi. Satirin sagina sabit; isaretliyken dolu. */
@@ -399,9 +744,50 @@
   .isaret.ekli { color: var(--vurgu); }
   .karar-sayi {
     flex: none; margin-top: 2px; font-size: 11px; font-weight: 600;
-    letter-spacing: .02em; color: var(--metin-sol);
-    background: var(--yuzey-alt); border: 1px solid var(--kenar-ince);
+    letter-spacing: .02em; color: rgba(30,26,18,.72);
+    background: rgba(255,255,255,.45); border: 1px solid rgba(0,0,0,.10);
     border-radius: 3px; padding: 2px 7px; white-space: nowrap;
+  }
+
+  /* ---------- KUCUK NOTLAR ----------
+     Ipucu ve altyazi cizgilerin uzerinde basibos duruyordu. Ikisi de
+     kucuk birer not kagidina alindi: sayfaya ait olduklari belli
+     olsun, ama madde notlarindan AYRILSINLAR -- onlar kaynak, bunlar
+     bizim aciklamamiz. Bu yuzden renksiz (kirik beyaz) ve daha kucuk. */
+  /* ---------- YIRTIK KAGIT ----------
+     Soru, cevap ve dogrulama TEK sayfada. Ustte ve altta testere
+     disi kenar: kagit defterden koparilmis gibi. Zemin DUZ --
+     cizgili olmasi metni zorlastiriyordu, cevap bizim yazimiz,
+     defterin kendi sayfasi degil. */
+  .ozet-kagit {
+    position: relative;
+    background: #fdfbf1;
+    padding: 34px 40px 38px;
+    margin: 26px auto 34px;
+    box-shadow:
+      0 2px 4px rgba(0,0,0,.10),
+      0 14px 26px -14px rgba(0,0,0,.34);
+    /* Testere disi ust ve alt kenar */
+    clip-path: polygon(
+      0% 8px, 4% 2px, 8% 7px, 12% 1px, 16% 6px, 20% 2px, 25% 8px,
+      30% 3px, 35% 7px, 40% 1px, 45% 6px, 50% 2px, 55% 7px, 60% 3px,
+      65% 8px, 70% 2px, 75% 6px, 80% 1px, 85% 7px, 90% 3px, 95% 6px,
+      100% 2px,
+      100% calc(100% - 7px), 95% calc(100% - 2px), 90% calc(100% - 8px),
+      85% calc(100% - 3px), 80% calc(100% - 6px), 75% calc(100% - 1px),
+      70% calc(100% - 7px), 65% calc(100% - 2px), 60% calc(100% - 8px),
+      55% calc(100% - 3px), 50% calc(100% - 6px), 45% calc(100% - 1px),
+      40% calc(100% - 7px), 35% calc(100% - 2px), 30% calc(100% - 8px),
+      25% calc(100% - 3px), 20% calc(100% - 6px), 15% calc(100% - 1px),
+      10% calc(100% - 7px), 5% calc(100% - 3px), 0% calc(100% - 6px));
+  }
+  .ozet-kagit .cevap {
+    border-left: 0; padding-left: 0; margin-bottom: 26px;
+    /* Biraz kalin: okunurluk sikayetinin asil cozumu bu. */
+    font-weight: 450;
+  }
+  .ozet-kagit .sorulan {
+    margin: 0 0 20px; padding-left: 0; border-left: 0;
   }
 
   .dosya-not {
@@ -437,9 +823,19 @@
     background: var(--uyari-bg); color: var(--uyari);
     white-space: nowrap; flex: none;
   }
+  /* GOVDE RENKSIZ. Not acilinca butun hukum metni doygun renk
+     uzerinde kaliyordu; uzun metni oyle okumak yoruyor ve sari
+     vurgu camgobegi zeminde kayboluyordu.
+     Fiziksel karsiligi da bu: post-it ETIKETTIR, altindaki belge
+     beyaz. Renk baslikta kaliyor, metin kagida duşuyor. */
+  .madde.acik .madde-govde, .karar.acik .madde-govde {
+    background: #fdfaf0;
+    box-shadow: inset 0 1px 3px rgba(0,0,0,.10);
+  }
   .madde-govde {
     display: none; padding: 4px 16px 18px;
-    font-family: var(--serif); font-size: 16.5px; line-height: 1.8;
+    font-family: var(--serif); font-size: 16.5px;
+    line-height: var(--satir);
     /* Asil metin rengi: hukum metni SAYFANIN ICERIGI, yan not degil.
        --metin-orta ile soluk gosterilince uzun pasaj yoruyordu. */
     color: var(--metin);
@@ -491,7 +887,7 @@
     font-family: var(--sans); font-size: 14px; font-style: italic;
     color: var(--metin-sol); font-weight: 400;
   }
-  .fikra { margin: 0 0 11px; }
+  .fikra { margin: 0 0 var(--satir); }
   .fikra:last-child { margin-bottom: 0; }
   .madde-dip {
     margin-top: 13px; font-size: 11.5px; color: var(--metin-sol);
@@ -553,45 +949,92 @@
   }
   .sorulan-etiket {
     display: block; margin-bottom: 4px;
-    font-family: var(--sans); font-size: 11px; font-weight: 600;
-    letter-spacing: .09em; text-transform: uppercase;
+    font-family: var(--daktilo); font-size: 11px; font-weight: 700;
+    letter-spacing: .14em; text-transform: uppercase;
     color: var(--metin-sol);
   }
-  .ipucu-satiri {
-    margin: 16px 2px 0; font-size: 12.5px; color: var(--metin-sol);
-    line-height: 1.6;
-  }
-  .ipucu-satiri b { color: var(--metin-orta); font-weight: 600; }
 
   /* Sekmeler: cevap ustte sabit kalir, referans bolumleri sekmede.
      Once hepsi tek sutunda alt alta duruyordu ve sonuc sayfasi
      okunamayacak kadar uzuyordu (10 madde + 5 karsi madde + 3 karar). */
   .sekmeler {
-    display: flex; flex-wrap: wrap; gap: 20px; margin: 30px 0 18px;
-    border-bottom: 1px solid var(--kenar-ince);
+    display: flex; flex-wrap: wrap; gap: 12px;
+    margin: 34px auto 22px; max-width: 980px;
+    align-items: flex-end;
   }
-  /* Hap seklinde dugmeler yerine altcizgili metin: sekme zaten bir
-     gezinme ogesi, dugme degil. */
+  /* Her sekme AYRI bir kucuk post-it. Once altcizgili duz metindi:
+     "gezinme ogesi, dugme degil" diye. Dogruydu ama sayfada hic
+     gorunmuyordu -- kullanici "goze batmiyor" dedi ve haklıydı.
+     Kucuk alanda doygun renk yormuyor; ayni renkler sayfayi bastan
+     basa kaplasa yorardi (notlarin doygunlugu o yuzden kisilmisti). */
   .sekme {
+    position: relative;
     display: inline-flex; align-items: center; gap: 7px;
-    padding: 8px 2px; font-size: 13.5px; font-family: inherit;
-    border: 0; border-bottom: 2px solid transparent; cursor: pointer;
-    background: none; color: var(--metin-sol);
+    padding: 10px 15px 10px 27px;   /* solda raptiyeye yer */
+    font-size: 13px; font-family: inherit;
+    border: 0; cursor: pointer; color: var(--metin-orta);
+    background: var(--yuzey);
+    box-shadow: 1px 2px 4px rgba(60,50,30,.25);
+    transition: transform .18s cubic-bezier(.2,.8,.3,1), box-shadow .18s;
   }
-  .sekme:hover { color: var(--metin-orta); }
-  .sekme.secili {
-    color: var(--metin); border-bottom-color: var(--vurgu);
+  /* RENKLI RAPTIYE. Once sekmenin tamami renkli post-it'ti; dort doygun
+     dikdortgen yan yana fazla geliyordu -- kullanicinin butun tasarim
+     boyunca soyledigi sey: yoran renk degil, rengin KAPLADIGI ALAN.
+     Isaret ayni kaldi, alan onda birine indi. */
+  .sekme::before {
+    content: ""; position: absolute; left: 9px; top: 50%;
+    width: 13px; height: 13px; margin-top: -7px; border-radius: 50%;
+    /* Kubbe dort katmanda kuruluyor: keskin isik noktasi, genis
+       yumusak isik, alt kenarda koyulasma, altta yansiyan hafif
+       aydinlanma. Tek radyal gradyanla denendi ve dumduz bir daire
+       gibi duruyordu -- plastik kubbe hissini veren sey tek parlaklik
+       degil, parlaklikla golgenin AYNI ANDA olmasi. */
+    background:
+      radial-gradient(circle at 37% 27%,
+        rgba(255,255,255,.95) 0 7%, rgba(255,255,255,0) 26%),
+      radial-gradient(circle at 41% 31%,
+        rgba(255,255,255,.5) 0, rgba(255,255,255,0) 46%),
+      radial-gradient(circle at 70% 76%,
+        rgba(255,255,255,.16) 0, rgba(255,255,255,0) 30%),
+      radial-gradient(circle at 60% 80%,
+        rgba(0,0,0,.45) 0, rgba(0,0,0,0) 58%),
+      var(--igne, #c8452f);
+    box-shadow:
+      0 0 0 .5px rgba(0,0,0,.38),        /* ince koyu cember */
+      1px 2px 3px rgba(60,45,25,.5),     /* kagida dusen golge */
+      2px 4px 6px rgba(60,45,25,.28),    /* golgenin yumusak eteği */
+      inset 0 -2px 3px rgba(0,0,0,.26);
+  }
+  .sekme.s1 { --igne: #c8452f; }
+  .sekme.s2 { --igne: #2f6a9e; }
+  .sekme.s3 { --igne: #4a8a4f; }
+  .sekme:nth-child(odd)  { transform: rotate(-1.2deg); }
+  .sekme:nth-child(even) { transform: rotate(1deg); }
+  .sekme:hover {
+    transform: translateY(-2px) rotate(0deg);
+    box-shadow: 2px 4px 8px rgba(60,50,30,.30);
   }
   .sekme-sayi {
     font-size: 11.5px; font-variant-numeric: tabular-nums;
-    opacity: .65;
+    opacity: .6;
   }
   /* Karsi taraf sekmesi ayirt edilsin. Renk "aleyhine" demiyor -- boyle bir
      yorum hukuki tavsiye olur ve olculen dogruluk onu tasimaz; yalnizca
      "bu bolum farkli bir sey gosteriyor" isareti. */
-  .sekme.dikkat { border-color: var(--uyari); color: var(--uyari); }
-  .sekme.dikkat.secili {
-    background: var(--uyari); color: var(--bg); border-color: var(--uyari);
+  .sekme.dikkat { --igne: #cf8b1c; color: var(--uyari); }
+  /* Secili not one cekilmis VE BANTLANMIS */
+  .sekme.secili {
+    transform: translateY(-3px) rotate(0deg);
+    box-shadow: 2px 5px 11px rgba(60,50,30,.34);
+    font-weight: 650; color: var(--metin);
+  }
+  .sekme.secili::before {
+    width: 15px; height: 15px; left: 8px; margin-top: -8px;
+    box-shadow:
+      0 0 0 .5px rgba(0,0,0,.4),
+      1px 3px 4px rgba(60,45,25,.55),
+      3px 5px 8px rgba(60,45,25,.3),
+      inset 0 -2px 4px rgba(0,0,0,.26);
   }
 
   .yukleniyor {
@@ -607,32 +1050,60 @@
   }
   @keyframes nokta { 0%{content:""} 25%{content:"."} 50%{content:".."} 75%{content:"..."} }
 
-  footer {
-    margin-top: 64px; padding-top: 22px;
-    border-top: 1px solid var(--kenar-ince);
-    font-size: 12.5px; line-height: 1.6; color: var(--metin-sol);
-  }
 </style>
 </head>
 <body>
 <div class="uygulama">
+<button class="kenar-ac" id="kenarAc" title="Sohbetleri aç" hidden>›</button>
 <aside class="kenar">
   <div class="kenar-bas">
     <h2 title="Çift tıklayarak adını değiştirin">Sohbetler</h2>
-    <span style="display:flex;gap:6px">
-      <button class="kenar-ekle" id="dosyaAc" title="Kaydedilmiş sohbeti aç">Aç</button>
+    <span style="display:flex;gap:6px;align-items:center">
       <button class="kenar-ekle" id="dosyaEkle">+ Yeni sohbet</button>
+      <button class="kenar-kapat" id="kenarKapat" title="Paneli kapat">‹</button>
     </span>
   </div>
-  <input type="file" id="dosyaGirdi" accept=".json,application/json" hidden>
   <div class="kenar-liste" id="dosyaListe"></div>
 </aside>
 <div class="kabuk">
 
-  <header>
-    <div class="marka">ai<span>bars</span></div>
-    <div class="durum"><span class="nokta bekle" id="nokta"></span><span id="durumMetni">hazırlanıyor</span></div>
-  </header>
+  <!-- Baslik, ayarlar ve ipucu AYNI YAPRAKTA ve uste yapistirilmis.
+       Once ucu ayri yerdeydi: logo ustte, ipucu sayfanin dibinde ayri
+       bir kagit, ayarlar aralarinda kayip. Uc ayri kagit ucu de
+       kaydirinca gozden gidiyordu. -->
+  <div class="ust-kagit">
+    <div class="ust-bas">
+      <div class="marka">ai<span>bars</span></div>
+      <div class="basli-sag">
+        <!-- Durum yalnizca SORUN varken konusuyor: "275.192 madde"
+             her acilista okunup gecilen bir sayiydi. Oturum dusunce
+             cikan "giris gerekli" uyarisi ise duruyor, yoksa sayfa
+             bozuk sanilyordu. -->
+        <div class="durum" id="durum" hidden>
+          <span class="nokta bekle" id="nokta"></span><span id="durumMetni"></span>
+        </div>
+        <div class="ayar-satiri">
+          <button id="ayarAc">Ayarlar</button>
+          <div id="ayarlar">
+            <label><input type="checkbox" id="cevapUret" checked> Cevap üret</label>
+            <label title="Cross-encoder ile ilgili cümleyi işaretler; madde başına ~1-3 saniye ekler"><input type="checkbox" id="vurguAc" checked> İlgili cümleyi vurgula (yavaşlatır)</label>
+            <label><input type="checkbox" id="mulgaHaric" checked> Yürürlükten kalkmışları gizle</label>
+            <label>Getirilecek madde
+              <select id="k"><option>5</option><option>8</option><option selected>10</option><option>15</option></select>
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="ipucu-satiri">
+      <p class="ipucu"><b>Olayı değil, meseleyi yazın.</b> Olayı yazarsanız
+      sistem size konu seçenekleri sunar. Madde numarasını biliyorsanız
+      doğrudan yazın: <b>TBK 344</b>, <b>4857 madde 19</b>.</p>
+      <p class="kucuk-yazi">Aibars genel bilgi verir, hukuki görüş yerine
+      geçmez. Cevaplar yalnızca indekslenmiş mevzuat metinlerine dayanır.
+      Karar dayanağı yapmadan önce bir avukata danışın.</p>
+    </div>
+  </div>
 
   <div class="arama">
     <textarea id="soru" rows="1" placeholder="Bir soru sorun…"></textarea>
@@ -642,33 +1113,10 @@
     </button>
   </div>
 
-  <div class="ipucu-satiri">
-    <b>Olayı değil, meseleyi yazın.</b> Ölçüldü: aynı soru olay olarak
-    anlatıldığında doğru madde 5 sorudan 1'inde ilk sırada çıkıyor, hukuki
-    kavram olarak yazıldığında 5'inde 5'inde. Olayı yazarsanız sistem size
-    konu seçenekleri sunar. Madde numarasını biliyorsanız doğrudan yazın:
-    <b>TBK 344</b>, <b>4857 madde 19</b>.
-  </div>
 
-  <div class="ayar-satiri">
-    <button id="ayarAc">Ayarlar</button>
-    <div id="ayarlar">
-      <label><input type="checkbox" id="cevapUret" checked> Cevap üret</label>
-      <label title="Cross-encoder ile ilgili cümleyi işaretler; madde başına ~1-3 saniye ekler"><input type="checkbox" id="vurguAc" checked> İlgili cümleyi vurgula (yavaşlatır)</label>
-      <label><input type="checkbox" id="mulgaHaric" checked> Yürürlükten kalkmışları gizle</label>
-      <label>Getirilecek madde
-        <select id="k"><option>5</option><option>8</option><option selected>10</option><option>15</option></select>
-      </label>
-    </div>
-  </div>
 
   <div id="cikti"></div>
 
-  <footer>
-    Aibars genel bilgi verir, hukuki görüş yerine geçmez. Cevaplar yalnızca
-    indekslenmiş mevzuat metinlerine dayanır; içtihat ve doktrin içermez.
-    Karar dayanağı yapmadan önce bir avukata danışın.
-  </footer>
 
 </div>
 </div>
@@ -712,6 +1160,7 @@ async function durumGuncelle(deneme = 0) {
     // Tarayici sayfayi onbellekten acinca kimlik gonderilmiyor ve boyle
     // oluyor.
     if (r.status === 401 || r.status === 403) {
+      $("#durum").hidden = false;
       $("#nokta").className = "nokta kapali";
       $("#durumMetni").innerHTML =
         '<a href="' + location.pathname + '?g=' + Date.now() +
@@ -720,15 +1169,16 @@ async function durumGuncelle(deneme = 0) {
     }
     const d = await r.json();
     if (!d.hazir) throw new Error(d.hata || "hazır değil");
-    $("#nokta").className = "nokta acik";
-    $("#durumMetni").textContent =
-      d.madde_sayisi.toLocaleString("tr-TR") + " madde";
+    // Hazir oldugunda hicbir sey yazmiyor: kac madde oldugu bilgisi
+    // her acilista okunup gecilen bir sayiydi, yer kapliyordu.
+    $("#durum").hidden = true;
   } catch (e) {
     // Sunucunun acilisi 90 saniyeyi buluyor (model + 174 bin vektor).
     // Onceki surum 20 x 3 sn = 60 saniye deneyip pes ediyordu, yani
     // sunucu hazir olmadan once vazgeciyordu. Artik vazgecmiyor; aralik
     // 3 saniyeden 10 saniyeye kadar aciliyor.
     const bekleme = Math.min(3000 + deneme * 500, 10000);
+    $("#durum").hidden = false;
     $("#nokta").className = "nokta bekle";
     $("#durumMetni").textContent =
       deneme < 30 ? "hazırlanıyor" : "hazırlanıyor (uzun sürüyor)";
@@ -762,13 +1212,16 @@ function cizNetlestirme(asil, meseleler) {
       kacis(m.baslik) + "</button>";
   }
   h += '</div><button class="dogrudan">Hiçbiri — olayı olduğu gibi ara</button></div>';
-  ciktiEl.innerHTML = h;
-  ciktiEl.querySelectorAll(".mesele").forEach(function (b) {
+  // "gecici": bir sonraki cizim bunu siler. Netlestirme bir ara adim,
+  // akista kalici bir halka degil.
+  const blok = konusmaEkle(h, "gecici");
+  blok.querySelectorAll(".mesele").forEach(function (b) {
     b.addEventListener("click", function () { sor(b.dataset.baslik); });
   });
-  ciktiEl.querySelector(".dogrudan").addEventListener("click", function () {
+  blok.querySelector(".dogrudan").addEventListener("click", function () {
     sor(asil, true);
   });
+  blogaKaydir(blok);
 }
 
 // Bekleme ekrani. Asama adlari GERCEK: hangi istegin surdugunu biliyoruz.
@@ -778,12 +1231,13 @@ function cizNetlestirme(asil, meseleler) {
 let _sayac = null;
 
 function yukleniyorGoster(metin) {
-  ciktiEl.innerHTML = '<div class="yukleniyor"><span class="yuk-metin">' +
-    kacis(metin) + '</span><span class="yuk-sure">0.0 sn</span></div>';
+  const blok = konusmaEkle('<div class="yukleniyor"><span class="yuk-metin">' +
+    kacis(metin) + '</span><span class="yuk-sure">0.0 sn</span></div>', "gecici");
+  blogaKaydir(blok);
   const bas = performance.now();
   clearInterval(_sayac);
   _sayac = setInterval(function () {
-    const el = ciktiEl.querySelector(".yuk-sure");
+    const el = blok.querySelector(".yuk-sure");
     if (!el) { clearInterval(_sayac); return; }
     el.textContent = ((performance.now() - bas) / 1000).toFixed(1) + " sn";
   }, 100);
@@ -834,11 +1288,12 @@ async function sor(secilen, netlestirmeyiAtla) {
       const b = document.createElement("div");
       b.className = "secilenMesele";
       b.textContent = "Aranan mesele: " + secilen;
-      ciktiEl.prepend(b);
+      const son = ciktiEl.lastElementChild;
+      if (son) son.prepend(b);
     }
   } catch (e) {
-    ciktiEl.innerHTML = '<div class="hata">Sunucuya ulaşılamadı.<code>' +
-      kacis(e.message) + "</code></div>";
+    konusmaEkle('<div class="hata">Sunucuya ulaşılamadı.<code>' +
+      kacis(e.message) + "</code></div>", "gecici");
   } finally {
     clearInterval(_sayac);
     gonderEl.disabled = false;
@@ -1027,7 +1482,10 @@ function kucult(d) {
     karar_kaynagi: d.karar_kaynagi, kayitli: true, zaman: Date.now(),
     maddeler: (d.maddeler || []).map(function (m) {
       const c = Object.assign({}, m);
-      delete c.parcalar; delete c.graf; delete c.yorumlayan_kararlar;
+      // parcalar KORUNUYOR: sari vurgu bilgisi onlarin icinde. Once
+      // atiliyordu ve gecmisten acilan cevaplarda vurgular kayboluyordu
+      // -- "sari cizgiler gitti" sikayetinin sebebi buydu.
+      delete c.graf; delete c.yorumlayan_kararlar;
       return c;
     }),
     kararlar: (d.kararlar || []).map(function (x) {
@@ -1071,6 +1529,9 @@ function soruKaydet(soru) {
   // sohbeti kendi yaratir.
   let d = acikDosya();
   if (!d) d = dosyaYeni(dosyaAdiUret(soru));
+  // "+ Yeni sohbet" ile acilan bos klasorun adi ilk soruda konuyu alsin;
+  // yoksa solda ust uste "Yeni sohbet" yaziyor, hicbiri ayirt edilmiyor.
+  else if (!d.sorular.length && d.ad === "Yeni sohbet") d.ad = dosyaAdiUret(soru);
   // Ayni soru tekrar sorulursa listede bir kez dursun, en uste gelsin.
   d.sorular = d.sorular.filter(function (x) { return x !== soru; });
   d.sorular.unshift(soru);
@@ -1079,11 +1540,14 @@ function soruKaydet(soru) {
 }
 
 function dosyalariCiz() {
+  // BIR KLASOR = BIR SOHBET. Klasorun altina soru listesi acmiyoruz:
+  // acilip kapanan alt liste, digerlerini asagi itip "otekiler kayboldu"
+  // hissi veriyordu ve sohbetin icinde ayrica bir kirilim varmis gibi
+  // duruyordu. Sohbetin sorulari sag taraftaki kagitta duruyor.
   const kap = document.getElementById("dosyaListe");
   if (!kap) return;
   if (!dosyalar.dosyalar.length) {
-    kap.innerHTML = '<div class="gecmis-soru" style="cursor:default">' +
-      "Henüz sohbet yok.</div>";
+    kap.innerHTML = '<div class="kenar-bos">Henüz sohbet yok.</div>';
     return;
   }
   let h = "";
@@ -1097,14 +1561,6 @@ function dosyalariCiz() {
            '<button class="dosya-sil" data-sil="' + kacis(d.id) +
              '" title="Sohbeti sil">×</button>' +
          "</div>";
-    if (secili && d.sorular.length) {
-      h += '<div class="kenar-gecmis">';
-      d.sorular.forEach(function (q) {
-        h += '<button class="gecmis-soru" data-soru="' + kacis(q) + '">' +
-             kacis(q) + "</button>";
-      });
-      h += "</div>";
-    }
   });
   kap.innerHTML = h;
 }
@@ -1138,9 +1594,15 @@ function isaretDegistir(tur, kimlik) {
   if (yer >= 0) {
     liste.splice(yer, 1);
   } else {
-    const kaynak = tur === "madde"
-      ? (sonVeri.maddeler || []).find(function (m) { return maddeKimlik(m) === kimlik; })
-      : (sonVeri.kararlar || []).find(function (k) { return (k.kisa_ad || "") === kimlik; });
+    // Kaynak BUTUN akista aranir: avukat yukari kaydirip ilk cevaptaki
+    // bir maddeyi de yildizlayabilmeli.
+    let kaynak = null;
+    for (let i = konusmalar.length - 1; i >= 0 && !kaynak; i--) {
+      const v = konusmalar[i];
+      kaynak = tur === "madde"
+        ? (v.maddeler || []).find(function (m) { return maddeKimlik(m) === kimlik; })
+        : (v.kararlar || []).find(function (k) { return (k.kisa_ad || "") === kimlik; });
+    }
     if (!kaynak) return;
     // Yalnizca gerekli alanlar saklaniyor: vurgu parcalari ve atif grafi
     // birlikte bir cevabi 138 KB yapiyor, tarayici hafizasini doldurur.
@@ -1155,7 +1617,7 @@ function isaretDegistir(tur, kimlik) {
     });
   }
   dosyaKaydet();
-  if (sonVeri) ciz(sonVeri);      // yildizlar tazelensin
+  yildizlariTazele();
 }
 
 function maddeOzet(m) {
@@ -1336,19 +1798,60 @@ function yorumlayanlar(m) {
   return h + "</div>";
 }
 
-function ciz(d) {
-  // Ilk kullanim ipucu SONUC EKRANINDA gurultu: iki satirlik olcum
-  // aciklamasi cevabi asagi itiyor ve avukat onu bir kez okuduktan
-  // sonra bir daha okumuyor. Sonuc gelince gizleniyor, arama kutusu
-  // temizlenince geri geliyor.
-  const ipucu = document.querySelector(".ipucu-satiri");
-  if (ipucu) ipucu.hidden = true;
+// SOHBET BIR AKIS. Her soru-cevap alta ekleniyor, oncekiler duruyor.
+// Once ciktiEl.innerHTML her cevapta bastan yaziliyordu: ikinci soru
+// sorulunca birincisi ekrandan siliniyordu ve -- yandaki alt soru
+// listesi de kaldirildigi icin -- geri donusu yoktu.
+let konusmalar = [];
+
+function bekleyeniSil() {
+  const b = ciktiEl.querySelector(".konusma.gecici");
+  if (b) b.remove();
+}
+
+function konusmaEkle(h, sinif) {
+  bekleyeniSil();
+  const blok = document.createElement("div");
+  blok.className = "konusma" + (sinif ? " " + sinif : "");
+  blok.innerHTML = h;
+  ciktiEl.appendChild(blok);
+  return blok;
+}
+
+function blogaKaydir(blok) {
+  blok.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// Yildiz durumu SAYFANIN TAMAMINDA tazeleniyor. Once ciz(sonVeri)
+// cagriliyordu; akista bu, cevabin bir kopyasini daha alta eklerdi.
+function yildizlariTazele() {
+  document.querySelectorAll("[data-isaret][data-kimlik]").forEach(function (b) {
+    const ekli = dosyadaMi(b.dataset.isaret, b.dataset.kimlik);
+    b.classList.toggle("ekli", ekli);
+    b.textContent = ekli ? "★" : "☆";
+    b.title = ekli ? "Kayıtlardan çıkar" : "Kaydet";
+  });
+  const dosya = acikDosya();
+  if (!dosya) return;
+  // "Kaydettiklerim" sekmesi dosyanin kendisini gosteriyor; her
+  // konusmada bir kopyasi var, hepsi guncellenmeli.
+  document.querySelectorAll('[data-panel-ad="dosya"]').forEach(function (p) {
+    p.innerHTML = dosyaPaneli(dosya);
+  });
+}
+
+function ciz(d, sessiz) {
+  // Ipucu bir ara sonuc gelince gizleniyordu (ust serit ince kalsin
+  // diye). Serit artik sabit degil, yukarida kaliyor; gizlemek
+  // yalnizca "yazi kayboldu" hissi veriyordu. Duruyor.
   sonVeri = d;
-  if (d.soru) {
+  konusmalar.push(d);
+  // Kayitli bir cevabi geri cizerken tekrar kaydetmiyoruz: kirpilmis
+  // surumu bir kez daha kirpmak, zamani guncellemek ve soru sirasini
+  // bozmak anlamsiz.
+  if (d.soru && !d.kayitli) {
     soruKaydet(d.soru);
-    // Kayitli bir cevabi geri cizerken tekrar kaydetmiyoruz: kirpilmis
-    // surumu bir kez daha kirpmak ve zamani guncellemek anlamsiz.
-    if (!d.kayitli) cevapKaydet(d);
+    cevapKaydet(d);
   }
 
   let h = "";
@@ -1357,6 +1860,9 @@ function ciz(d) {
   // sayfada neye cevap verildigini soyleyen hicbir sey kalmiyordu --
   // ozellikle netlestirme sonrasi, cunku orada aranan sey kullanicinin
   // yazdigindan farkli.
+  // Soru + cevap + dogrulama TEK KAGIT. Once ayri ayri duruyorlardi ve
+  // sayfada dagilmis, birbiriyle ilgisiz parcalar gibi gorunuyordu.
+  h += '<div class="ozet-kagit">';
   if (d.soru) {
     h += '<div class="sorulan"><span class="sorulan-etiket">Soru</span>' +
       kacis(d.soru) + "</div>";
@@ -1368,7 +1874,8 @@ function ciz(d) {
     const t = d.zaman ? new Date(d.zaman).toLocaleString("tr-TR") : "";
     h += '<div class="kayitli-serit">Kayıtlı cevap' +
       (t ? " · " + kacis(t) : "") +
-      ' <button id="yenidenSor">yeniden sor</button></div>';
+      ' <button class="yeniden-sor" data-soru="' + kacis(d.soru || "") +
+      '">yeniden sor</button></div>';
   }
 
   if (d.guven && d.guven.dusuk) {
@@ -1391,9 +1898,11 @@ function ciz(d) {
   if (!d.maddeler.length) {
     h += '<div class="bilgi">Bu soruya dayanak olabilecek bir madde bulunamadı. ' +
          "Aranan konu indekslenmiş kanunların dışında olabilir.</div>";
-    ciktiEl.innerHTML = h;
+    const bos = konusmaEkle(h + "</div>");
+    if (!sessiz) blogaKaydir(bos);
     return;
   }
+  h += "</div>";   // ozet-kagit kapanisi
 
   // Referans bolumleri SEKMEDE. Onceden hepsi tek sutunda alt alta
   // duruyordu: 10 dayanak maddesi + 5 karsi taraf maddesi + 3 karar,
@@ -1414,36 +1923,55 @@ function ciz(d) {
   }
   const dosya = acikDosya();
   if (dosya) {
-    paneller.push({ ad: "Kaydettiklerim",
+    paneller.push({ ad: "Kaydettiklerim", dosya: true,
                     sayi: dosya.maddeler.length + dosya.kararlar.length,
                     icerik: dosyaPaneli(dosya) });
   }
 
   h += '<div class="sekmeler">';
+  let sekmeSira = 0;
   paneller.forEach(function (p, i) {
-    h += '<button class="sekme' + (i === 0 ? " secili" : "") +
-      (p.dikkat ? " dikkat" : "") + '" data-panel="' + i + '">' +
+    const renk = p.dikkat ? " dikkat" : " s" + (sekmeSira++ % 3 + 1);
+    h += '<button class="sekme' + renk + (i === 0 ? " secili" : "") +
+      '" data-panel="' + i + '">' +
       kacis(p.ad) + '<span class="sekme-sayi">' + p.sayi + "</span></button>";
   });
   h += "</div>";
   paneller.forEach(function (p, i) {
     h += '<div class="panel" data-panel="' + i + '"' +
+      (p.dosya ? ' data-panel-ad="dosya"' : "") +
       (i === 0 ? "" : " hidden") + ">" + p.icerik + "</div>";
   });
 
-  ciktiEl.innerHTML = h;
-  ciktiEl.querySelectorAll(".sekme").forEach(function (b) {
-    b.addEventListener("click", function () { sekmeSec(b.dataset.panel); });
+  const blok = konusmaEkle(h);
+  blok.querySelectorAll(".sekme").forEach(function (b) {
+    b.addEventListener("click", function () { sekmeSec(blok, b.dataset.panel); });
+  });
+  if (!sessiz) blogaKaydir(blok);
+}
+
+// Sekmeler KENDI konusmasi icinde calisiyor. Once butun ciktiya
+// bakiyordu; akista bir sekmeye basmak butun konusmalarin panellerini
+// birden degistirirdi.
+function sekmeSec(blok, no) {
+  blok.querySelectorAll(".sekme").forEach(function (b) {
+    b.classList.toggle("secili", b.dataset.panel === no);
+  });
+  blok.querySelectorAll(".panel").forEach(function (p) {
+    p.hidden = p.dataset.panel !== no;
   });
 }
 
-function sekmeSec(no) {
-  ciktiEl.querySelectorAll(".sekme").forEach(function (b) {
-    b.classList.toggle("secili", b.dataset.panel === no);
-  });
-  ciktiEl.querySelectorAll(".panel").forEach(function (p) {
-    p.hidden = p.dataset.panel !== no;
-  });
+// Bir sohbetin butun soru-cevaplarini eskiden yeniye dogru cizer.
+function konusmayiCiz(dosya) {
+  ciktiEl.innerHTML = "";
+  konusmalar = [];
+  sonVeri = null;
+  const kayitlar = (dosya.cevaplar || []).slice().reverse();
+  kayitlar.forEach(function (k) { ciz(k, true); });
+  const son = ciktiEl.lastElementChild;
+  if (son) son.scrollIntoView({ block: "start" });
+  return kayitlar.length;
 }
 
 function dayanakPaneli(d) {
@@ -1463,6 +1991,8 @@ function dayanakPaneli(d) {
     harita.get(m.mevzuat_adi).maddeler.push(m);
   });
   const gruplar = [...harita.values()].sort((a, b) => a.enIyi - b.enIyi);
+  // Not rengi tum liste boyunca doner; grup sinirlarinda sifirlanmaz.
+  let notSira = 0;
 
   gruplar.forEach(g => {
     h += '<div class="grup"><div class="grup-basligi">' + kacis(g.ad) +
@@ -1478,7 +2008,7 @@ function dayanakPaneli(d) {
       if (m.mulga) rozet = '<span class="rozet">yürürlükte değil</span>';
       else if (m.kismi_mulga) rozet = '<span class="rozet">kısmen değişik</span>';
 
-      h += '<div class="madde">' +
+      h += '<div class="madde n' + ((notSira++ % 6) + 1) + '">' +
         '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
           '<span class="ok">▶</span>' +
           '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
@@ -1568,7 +2098,7 @@ function dosyaIceriAktar(dosyaNesnesi) {
     dosyalar.dosyalar.unshift(d);
     dosyalar.acik = d.id;
     dosyaKaydet();
-    if (sonVeri) ciz(sonVeri);
+    konusmayiCiz(d);
   };
   okuyucu.readAsText(dosyaNesnesi);
 }
@@ -1636,7 +2166,7 @@ function dosyaPaneli(d) {
     "Tarayıcınızda saklanır, sunucuya gönderilmez; başka bir " +
     "bilgisayarda açtığınızda gelmez.</div>";
 
-  h += '<textarea class="dosya-not" id="dosyaNot" rows="3" ' +
+  h += '<textarea class="dosya-not" rows="3" ' +
        'placeholder="Bu sohbet için notlarınız…">' + kacis(d.not_ || "") +
        "</textarea>";
 
@@ -1648,8 +2178,9 @@ function dosyaPaneli(d) {
   if (d.maddeler.length) {
     h += '<div class="grup-basligi">Maddeler<span class="grup-sayi">' +
          d.maddeler.length + "</span></div>";
+    let dosyaSira = 0;
     d.maddeler.forEach(function (m) {
-      h += '<div class="madde">' +
+      h += '<div class="madde n' + ((dosyaSira++ % 6) + 1) + '">' +
         '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
           '<span class="ok">▶</span>' +
           '<span class="madde-no">m.' + kacis(m.madde_no) + "</span>" +
@@ -1682,8 +2213,9 @@ function dosyaPaneli(d) {
   return h;
 }
 
+let kartSira = 0;
 function kararKarti(kr) {
-  return '<div class="karar">' +
+  return '<div class="karar n' + ((kartSira++ % 6) + 1) + '">' +
     '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
       '<span class="ok">▶</span>' +
       '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
@@ -1700,8 +2232,11 @@ async function dahaKararGetir(dugme) {
   // bir uc var. Gemini cagrisi yok, vurgu hesabi yok.
   const soru = (sonVeri && sonVeri.soru) || "";
   if (!soru) return;
-  const liste = document.getElementById("kararListe");
-  const varolan = [...document.querySelectorAll("#kararListe .karar-ad")]
+  // Kendi konusma blogunun listesi: akista birden fazla karar listesi var.
+  const blok = dugme.closest(".konusma");
+  const liste = blok && blok.querySelector(".karar-liste");
+  if (!liste) return;
+  const varolan = [...liste.querySelectorAll(".karar-ad")]
     .map(function (x) { return x.textContent; });
   dugme.disabled = true;
   dugme.textContent = "Aranıyor…";
@@ -1752,9 +2287,10 @@ function kararPaneli(kararlar, kaynak) {
     h += '<div class="karar-kaynak">Bu soruda <b>yerel arşiv</b> daha ' +
       "alakalı sonuç verdi; canlı sonuçlarla karşılaştırıldı.</div>";
   }
-  h += '<div id="kararListe">';
+  h += '<div class="karar-liste">';
+  let kararSira = 0;
   kararlar.forEach(function (kr) {
-    h += '<div class="karar">' +
+    h += '<div class="karar n' + ((kararSira++ % 6) + 1) + '">' +
       '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
         '<span class="ok">▶</span>' +
         '<span class="karar-ad">' + kacis(kr.kisa_ad || kr.daire) + "</span>" +
@@ -1766,26 +2302,44 @@ function kararPaneli(kararlar, kaynak) {
       '<div class="madde-govde">' + fikralara(kr.metin) + "</div></div>";
   });
   h += "</div>";
-  h += '<button class="daha-karar" id="dahaKarar">Daha fazla karar getir</button>';
+  h += '<button class="daha-karar">Daha fazla karar getir</button>';
   return h;
 }
 
 /* Olay yetkilendirme: kenar cubugu ve isaret dugmeleri her cizimde
    yeniden uretiliyor, tek tek dinleyici baglamak sizinti demek. */
+/* Kenar cubugu acma/kapama. Tercih hatirlanir: avukat kapatmissa
+   her acilista tekrar kapatmak zorunda kalmasin. */
+const uygulamaEl = document.querySelector(".uygulama");
+const kenarAcEl = document.getElementById("kenarAc");
+
+function kenarDurum(kapali) {
+  uygulamaEl.classList.toggle("kenar-kapali", kapali);
+  kenarAcEl.hidden = !kapali;
+  try { localStorage.setItem("aibars.kenar", kapali ? "kapali" : "acik"); }
+  catch (e) { /* depolama kapali olabilir; onemli degil */ }
+}
+
+document.getElementById("kenarKapat").onclick = function () { kenarDurum(true); };
+kenarAcEl.onclick = function () { kenarDurum(false); };
+try {
+  if (localStorage.getItem("aibars.kenar") === "kapali") kenarDurum(true);
+} catch (e) { /* yoksay */ }
+
 document.getElementById("dosyaEkle").onclick = function () {
-  // ChatGPT/Gemini davranisi: "yeni sohbet" ONCEDEN bos bir kayit
-  // olusturmuyor, yalnizca SECIMI BIRAKIYOR. Sohbet ilk soru
-  // sorulunca dogar ve adini o sorudan alir.
-  //
-  // Onceki hal kullaniciya "dosya adi" soruyordu; iki sorun vardi:
-  // (1) adlandirma isini soru sorulmadan ONCE yapmak, kimsenin
-  //     yapmadigi bir adim, (2) uzerine bos kayitlar birikiyordu.
-  dosyalar.acik = null;
+  // Kullanici "tek sohbet = tek dosya, yeni sohbet gelince yeni dosya"
+  // dedi: dugmeye basinca klasor SOLDA HEMEN gorunuyor, ilk soruyu
+  // beklemiyor. Ust siradaki klasor zaten bos ise yenisini uretmiyoruz,
+  // yoksa ard arda basista bos klasorler birikirdi.
+  const ilk = dosyalar.dosyalar[0];
+  const bos = ilk && !ilk.sorular.length &&
+              !ilk.maddeler.length && !ilk.kararlar.length;
+  if (bos) dosyalar.acik = ilk.id;
+  else dosyaYeni("Yeni sohbet");
   Depo.yaz(dosyalar);
   dosyalariCiz();
   cikti.innerHTML = "";
-  const ipucu = document.querySelector(".ipucu-satiri");
-  if (ipucu) ipucu.hidden = false;
+  konusmalar = [];
   soruEl.value = "";
   soruEl.focus();
   sonVeri = null;
@@ -1802,49 +2356,43 @@ document.getElementById("dosyaListe").addEventListener("dblclick", function (e) 
   if (ad === null) return;
   d.ad = ad.trim() || d.ad;
   dosyaKaydet();
-  if (sonVeri) ciz(sonVeri);      // sekme adi da degissin
+  // "Kaydettiklerim" panelinde dosya adi yaziyor; akisi bastan cizmek
+  // yerine yalnizca o panelleri tazeliyoruz.
+  yildizlariTazele();
 });
 
 document.getElementById("dosyaListe").addEventListener("click", function (e) {
   const sil = e.target.closest("[data-sil]");
   if (sil) { e.stopPropagation(); dosyaSil(sil.dataset.sil); return; }
-  const q = e.target.closest("[data-soru]");
-  if (q) {
-    soruEl.value = q.dataset.soru;
-    // Kayitli cevap varsa ANINDA goster. Yeniden sormak 10 saniye
-    // suruyor, bir Gemini cagrisi harciyor ve farkli cevap gelebiliyor;
-    // gecmise tiklamanin beklentisi "gordugum sey geri gelsin".
-    const kayit = kayitliCevap(q.dataset.soru);
-    if (kayit) { ciz(kayit); window.scrollTo({ top: 0, behavior: "smooth" }); }
-    else sor();
-    return;
-  }
-  const d = e.target.closest("[data-dosya]");
-  if (d) {
-    // Ayni dosyaya tekrar tiklamak kapatir: gecmis listesi uzun,
-    // kapatabilmek gerekiyor.
-    dosyalar.acik = dosyalar.acik === d.dataset.dosya ? null : d.dataset.dosya;
-    dosyaKaydet();
+  const el = e.target.closest("[data-dosya]");
+  if (!el) return;
+  const d = dosyalar.dosyalar.find(function (x) { return x.id === el.dataset.dosya; });
+  if (!d) return;
+  // Tiklamak SECER, kapatmaz. Once ayni klasore ikinci tik secimi
+  // birakiyordu; kullanici bunu "ustune basinca digerleri gidiyor"
+  // diye gordu -- klasorun kendisi de sonmus gibi oluyordu.
+  dosyalar.acik = d.id;
+  dosyaKaydet();
+  // Sohbeti ac: son kaydedilen cevap aninda geri gelsin. Yeniden
+  // sormak 10 saniye ve bir Gemini cagrisi demek.
+  // Sohbetin TAMAMI geri gelir, yalnizca son cevap degil.
+  if (!konusmayiCiz(d)) {
+    sonVeri = null;
+    soruEl.focus();
   }
 });
 
-document.getElementById("dosyaAc").onclick = function () {
-  document.getElementById("dosyaGirdi").click();
-};
-document.getElementById("dosyaGirdi").onchange = function (e) {
-  const f = e.target.files && e.target.files[0];
-  if (f) dosyaIceriAktar(f);
-  e.target.value = "";       // ayni dosya tekrar secilebilsin
-};
-
 document.getElementById("cikti").addEventListener("click", function (e) {
   // Not alani ve dosya dugmeleri de bu panelde
-  if (e.target.id === "dahaKarar") {
+  if (e.target.classList.contains("daha-karar")) {
     dahaKararGetir(e.target);
     return;
   }
-  if (e.target.id === "yenidenSor") {
-    soruEl.value = (sonVeri && sonVeri.soru) || soruEl.value;
+  if (e.target.classList.contains("yeniden-sor")) {
+    // Soru dugmenin kendisinde: akista eski bir cevabin uzerindeki
+    // dugmeye basilirsa O cevabin sorusu tekrarlanmali, en sonuncusu
+    // degil.
+    soruEl.value = e.target.dataset.soru || soruEl.value;
     sor();
     return;
   }
@@ -1867,7 +2415,7 @@ document.getElementById("cikti").addEventListener("click", function (e) {
 });
 
 document.getElementById("cikti").addEventListener("input", function (e) {
-  if (e.target.id !== "dosyaNot") return;
+  if (!e.target.classList.contains("dosya-not")) return;
   const d = acikDosya();
   if (!d) return;
   d.not_ = e.target.value;

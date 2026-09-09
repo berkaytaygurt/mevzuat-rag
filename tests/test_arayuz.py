@@ -103,8 +103,30 @@ def test_panel_gorunurlugu_hidden_ile_yonetiliyor():
 def test_ciz_hala_tek_giris_noktasi():
     """ciz() paneli kurup olay dinleyicilerini bagliyor."""
     js = _script()
-    assert "function ciz(d)" in js
+    assert "function ciz(d, sessiz)" in js
     assert 'querySelectorAll(".sekme")' in js
+
+
+def test_konusma_akisi_ustune_yaziyor_degil_ekliyor():
+    """Ikinci soru birincinin cevabini silmemeli.
+
+    Once ciz() her cagrisinda ciktiEl.innerHTML'i bastan yaziyordu; ikinci
+    soru sorulunca birinci cevap ekrandan siliniyor ve geri donusu
+    kalmiyordu. Simdi her soru-cevap bir .konusma blogu olarak ekleniyor.
+    """
+    js = _script()
+    assert "ciktiEl.appendChild(blok)" in js
+    # Cevap cizen yolda innerHTML ile bastan yazma kalmamali; yalnizca
+    # akisi temizleyen yerlerde (yeni sohbet, sohbet degistirme) var.
+    assert 'ciktiEl.innerHTML = h' not in js
+    assert "function konusmayiCiz(dosya)" in js
+
+
+def test_sekme_kendi_konusmasinda_calisir():
+    """Sekmeye basmak butun konusmalarin panellerini degistirmemeli."""
+    js = _script()
+    assert "function sekmeSec(blok, no)" in js
+    assert 'blok.querySelectorAll(".panel")' in js
 
 
 def test_sor_olay_dinleyicisine_dogrudan_baglanmiyor():
