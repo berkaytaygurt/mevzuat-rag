@@ -117,3 +117,53 @@ def test_txt_de_okunuyor(istemci):
         "dosya": ("olay.txt", DILEKCE.encode("utf-8"), "text/plain")})
     assert r.status_code == 200
     assert "[TCKN_1]" in r.json()["maskeli"]
+
+
+def test_maskeli_pdf_indiriliyor(istemci):
+    """Avukat maskeli surumu dosya olarak alabilmeli.
+
+    Amac: ayni belgeyi baska bir araca verecekse (kendi ChatGPT'sine,
+    meslektasina) ham dilekceyi degil bunu versin.
+    """
+    r = istemci.post("/api/belge", files={
+        "dosya": ("dilekce.txt", DILEKCE.encode("utf-8"), "text/plain")})
+    maskeli = r.json()["maskeli"]
+
+    p = istemci.post("/api/belge/pdf",
+                     json={"metin": maskeli, "ad": "dilekce-maskeli"})
+    assert p.status_code == 200
+    assert p.headers["content-type"] == "application/pdf"
+    assert "dilekce-maskeli.pdf" in p.headers.get("content-disposition", "")
+
+    belge = pymupdf.open(stream=p.content, filetype="pdf")
+    metin = "\n".join(s.get_text() for s in belge)
+    for gizli in ("Ahmet Yılmaz", "10000000146", "0532 111 22 33",
+                  "Kızılay", "Örnek Yapı"):
+        assert gizli not in metin, f"indirilen PDF'e sizdi: {gizli}"
+    for iz in ("[TCKN_1]", "4857", "m.19"):
+        assert iz in metin, f"kayboldu: {iz}"
+    belge.close()
+
+
+def test_indirilen_pdf_ustverisi_temiz(istemci):
+    """Kaynak belgenin yazar/baslik alanlari tasinsa, maskelenen isim
+    PDF ustverisinde geri gelirdi."""
+    p = istemci.post("/api/belge/pdf",
+                     json={"metin": "[KISI_1] hakkinda", "ad": "x"})
+    belge = pymupdf.open(stream=p.content, filetype="pdf")
+    for alan in ("author", "subject", "keywords", "creator", "producer"):
+        assert not (belge.metadata.get(alan) or ""), alan
+    belge.close()
+
+
+def test_bos_metin_pdf_olmuyor(istemci):
+    assert istemci.post("/api/belge/pdf",
+                        json={"metin": "   ", "ad": "x"}).status_code == 422
+
+
+def test_dosya_adi_temizleniyor(istemci):
+    """Ad dogrudan bir baslige giriyor; yol ve tirnak tasimamali."""
+    p = istemci.post("/api/belge/pdf",
+                     json={"metin": "deneme", "ad": '../../gizli"dosya'})
+    yerlesim = p.headers.get("content-disposition", "")
+    assert ".." not in yerlesim and '"dosya' not in yerlesim

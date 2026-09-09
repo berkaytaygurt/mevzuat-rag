@@ -479,6 +479,16 @@
     border: none; border-radius: 3px;
   }
   .onay-gonder:disabled { opacity: .45; cursor: default; }
+  .onay-indir {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    padding: 8px 14px; color: var(--metin-orta);
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-radius: 3px;
+  }
+  .onay-indir:hover:not(:disabled) {
+    border-color: var(--vurgu); color: var(--vurgu);
+  }
+  .onay-indir:disabled { opacity: .6; cursor: default; }
   .onay-vazgec {
     font: inherit; font-size: 12.5px; cursor: pointer;
     background: none; border: 0; color: var(--metin-sol);
@@ -2556,6 +2566,7 @@ function belgeCiz(d, dosyaAdi) {
         kacis(d.maskeli) + "</textarea>" +
       '<div class="onay-alt">' +
         '<button class="onay-gonder" id="onayGonder">Onayla ve analiz et</button>' +
+        '<button class="onay-indir" id="onayIndir">Maskeli PDF indir</button>' +
         '<button class="onay-vazgec" id="onayVazgec">Vazgeç</button>' +
         '<span class="onay-ipucu">Gözden kaçan bir isim varsa metinde ' +
           "doğrudan düzeltebilirsiniz.</span>" +
@@ -2570,7 +2581,53 @@ function belgeCiz(d, dosyaAdi) {
   blok.querySelector("#onayGonder").onclick = function () {
     belgeAnaliz(blok, dosyaAdi);
   };
+  blok.querySelector("#onayIndir").onclick = function () {
+    maskeliIndir(blok, dosyaAdi);
+  };
   blogaKaydir(blok);
+}
+
+/* Maskeli surumu dosya olarak verir. Avukat ayni belgeyi baska bir
+   araca (kendi ChatGPT'sine, meslektasina) verecekse ham dilekceyi
+   degil bunu vermeli. Uretim sunucuda, yani kendi makinesinde. */
+async function maskeliIndir(blok, dosyaAdi) {
+  const dugme = blok.querySelector("#onayIndir");
+  const metin = blok.querySelector("#maskeliMetin").value;
+  const eskiMetin = dugme.textContent;
+  dugme.disabled = true;
+  dugme.textContent = "Hazırlanıyor…";
+  try {
+    const ad = (dosyaAdi || "belge").replace(/\.[^.]+$/, "") + "-maskeli";
+    const r = await fetch("api/belge/pdf", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metin: metin, ad: ad }),
+    });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    const kutu = await r.blob();
+    const url = URL.createObjectURL(kutu);
+    const bag = document.createElement("a");
+    bag.href = url;
+    bag.download = ad + ".pdf";
+    document.body.appendChild(bag);
+    bag.click();
+    bag.remove();
+    // Hemen iptal edilirse Firefox indirmeyi yarida kesiyor.
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    dugme.textContent = "İndirildi ✓";
+    setTimeout(function () {
+      dugme.textContent = eskiMetin;
+      dugme.disabled = false;
+    }, 2500);
+  } catch (hata) {
+    dugme.disabled = false;
+    dugme.textContent = eskiMetin;
+    konusmaEkle('<div class="hata">PDF hazırlanamadı.<code>' +
+      kacis(hata.message) + "</code></div>", "gecici");
+  }
 }
 
 async function belgeAnaliz(blok, dosyaAdi) {

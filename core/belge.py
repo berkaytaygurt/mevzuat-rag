@@ -190,3 +190,89 @@ def adaylar(metin: str) -> dict[str, list[str]]:
         "ADRES": adres_adaylari(metin),
         "KURUM": kurum_adaylari(metin),
     }
+
+
+# Maskeli metni PDF'e dokerken kullanilacak yazitipi. Gomulu "helv"
+# Latin-1 disina cikamiyor ve "ş/ğ/İ" bos kutu oluyor; sistemde bulunan
+# ilk kapsamli yazitipi seciliyor.
+YAZITIPI_ADAYLARI = [
+    r"C:\Windows\Fontsrial.ttf",
+    r"C:\Windows\Fonts\calibri.ttf",
+    r"C:\Windows\Fonts\segoeui.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/Library/Fonts/Arial.ttf",
+]
+
+
+def _yazitipi():
+    import pymupdf
+    from pathlib import Path as _P
+
+    for yol in YAZITIPI_ADAYLARI:
+        if _P(yol).exists():
+            return pymupdf.Font(fontfile=yol)
+    raise RuntimeError("Turkce karakterleri tasiyan bir yazitipi bulunamadi.")
+
+
+def pdfe_dok(metin: str, baslik: str = "Maskelenmiş belge") -> bytes:
+    """Maskeli metinden PDF uretir.
+
+    NEDEN: avukat maskelenmis surumu kendi elinde tutmak isteyebilir --
+    baska bir araca verecekse ham dilekceyi degil bunu vermeli.
+
+    USTVERI BILEREK BOSALTILIYOR: kaynak belgenin yazar/baslik alanlari
+    tasinsa, maskelenen ismin PDF ustverisinde geri gelmesi isten degil.
+    """
+    import pymupdf
+
+    yazitipi = _yazitipi()
+    belge = pymupdf.open()
+    kenar, satir_yuksekligi, yazi_boyu = 52.0, 13.5, 9.5
+
+    def yeni_sayfa():
+        sayfa = belge.new_page()
+        return sayfa, pymupdf.TextWriter(sayfa.rect), kenar + 20
+
+    sayfa, yazici, y = yeni_sayfa()
+    genislik = sayfa.rect.width - 2 * kenar
+
+    for ham in metin.splitlines():
+        # Uzun satirlar sayfa disina tasmasin diye sariliyor.
+        parcalar = _sar(ham, yazitipi, yazi_boyu, genislik) or [""]
+        for parca in parcalar:
+            if y > sayfa.rect.height - kenar:
+                yazici.write_text(sayfa)
+                sayfa, yazici, y = yeni_sayfa()
+            if parca:
+                yazici.append((kenar, y), parca, font=yazitipi, fontsize=yazi_boyu)
+            y += satir_yuksekligi
+    yazici.write_text(sayfa)
+
+    belge.set_metadata({"title": baslik, "author": "", "subject": "",
+                        "keywords": "", "creator": "", "producer": ""})
+    # Yazitipi kullanilan harflere indiriliyor: gomulu Arial tek sayfalik
+    # belgeyi 1,7 MB yapiyordu.
+    try:
+        belge.subset_fonts()
+    except Exception:
+        pass
+    veri = belge.tobytes(garbage=3, deflate=True)
+    belge.close()
+    return veri
+
+
+def _sar(satir: str, yazitipi, boy: float, genislik: float) -> list[str]:
+    """Satiri verilen genislige sigacak parcalara boler."""
+    if not satir.strip():
+        return [""]
+    parcalar, simdiki = [], ""
+    for kelime in satir.split(" "):
+        deneme = (simdiki + " " + kelime).strip()
+        if yazitipi.text_length(deneme, boy) <= genislik or not simdiki:
+            simdiki = deneme
+        else:
+            parcalar.append(simdiki)
+            simdiki = kelime
+    if simdiki:
+        parcalar.append(simdiki)
+    return parcalar

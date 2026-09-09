@@ -17,6 +17,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import secrets
 import time
 from pathlib import Path
@@ -546,6 +547,45 @@ def belge_analiz(istek: BelgeAnaliz):
         })
     return {"bolumler": bolumler, "mesele_sayisi": len(meseleler),
             "ozet": maske.ozet()}
+
+
+class MaskeliPdf(BaseModel):
+    metin: str
+    ad: str = "maskeli-belge"
+
+
+@app.post("/api/belge/pdf")
+def maskeli_pdf(istek: MaskeliPdf):
+    """Maskeli metni PDF olarak doner.
+
+    NEDEN: avukat maskelenmis surumu kendi elinde tutmak isteyebilir.
+    Baska bir araca (kendi ChatGPT'sine, meslektasina) verecekse ham
+    dilekceyi degil bunu vermeli. Uretim tamamen yerelde; bu uc de
+    Gemini'yi cagirmiyor.
+    """
+    from fastapi.responses import Response
+
+    from core.belge import pdfe_dok
+
+    metin = (istek.metin or "").strip()
+    if not metin:
+        raise HTTPException(422, "Bos metin PDF'e cevrilemez.")
+    if len(metin) > 400_000:
+        raise HTTPException(413, "Metin cok uzun.")
+    try:
+        veri = pdfe_dok(metin)
+    except RuntimeError as exc:
+        raise HTTPException(500, str(exc))
+
+    # Ad dogrudan Content-Disposition basligina giriyor. Dosya yazmadigimiz
+    # icin yol asimi degil, ama arka arkaya nokta ("..") indirme adinda
+    # tarayiciya gore garip davraniyor; nokta dizileri tekile indiriliyor.
+    guvenli = re.sub(r"[^A-Za-z0-9._-]+", "-", istek.ad or "")
+    guvenli = re.sub(r"\.{2,}", ".", guvenli).strip(".-")[:60]
+    return Response(
+        content=veri, media_type="application/pdf",
+        headers={"Content-Disposition":
+                 f'attachment; filename="{guvenli or "maskeli-belge"}.pdf"'})
 
 
 class DahaKarar(BaseModel):
