@@ -79,6 +79,11 @@ def meseleleri_ayir(soru: str, uretici) -> list[str]:
     satirlar = []
     for satir in (c or "").split("\n"):
         s = re.sub(r"^\s*(?:\d+[.)]\s*|[-*•]\s*)", "", satir).strip()
+        # Markdown vurgusu temizleniyor. Gemini duz satir donduruyor,
+        # bu yuzden gerekmiyordu; kucuk yerel modeller ise listelerini
+        # kalinlastiriyor ("**iscinin savunmasinin alinmasi**"). Yildizlar
+        # kalirsa arama terimine giriyor ve eslesmeyi bozuyor.
+        s = re.sub(r"[*_]{1,3}", "", s).strip()
         # Ust sinir 140: meselelerin baglam tasimasini istedigimiz icin
         # satirlar uzadi ("is sozlesmesinin feshinde iscinin savunmasinin
         # alinmasi zorunlulugu" = 66 karakter). 90 sinirindayken uzun
