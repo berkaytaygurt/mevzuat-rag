@@ -21,7 +21,7 @@ import secrets
 import time
 from pathlib import Path
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.staticfiles import StaticFiles
@@ -431,6 +431,121 @@ def durum():
 
 class Netlestirme(BaseModel):
     soru: str
+
+
+# ---------------------------------------------------------------- belge
+# BELGE YUKLEME. Iki adimli, cunku tek adimli olamaz: avukat neyin
+# disari gittigini GORMEDEN gondermemeli.
+#
+#   1) /api/belge        dosya -> yerelde metin -> maskele -> ONAYA sun
+#   2) /api/belge/analiz onaylanan maskeli metin -> mesele -> arama
+#
+# Ham dilekce hicbir zaman disari cikmiyor; Gemini yalnizca ikinci
+# adimda ve yalnizca maskelenmis metni goruyor. Esleme tablosu bu
+# surecin BELLEGINDE, kullanicinin kendi makinesinde duruyor -- diske
+# yazilmiyor, cevaba konmuyor.
+_MASKELER: dict[str, tuple[float, object]] = {}
+BELGE_OMRU = 3600.0          # bir saat sonra bellekten dusuyor
+EN_BUYUK_BELGE = 10 * 1024 * 1024
+
+
+def _maske_temizle() -> None:
+    simdi = time.time()
+    for anahtar in [k for k, (t, _) in _MASKELER.items()
+                    if simdi - t > BELGE_OMRU]:
+        _MASKELER.pop(anahtar, None)
+
+
+@app.post("/api/belge")
+async def belge_yukle(dosya: UploadFile = File(...)):
+    """Belgeyi YERELDE metne cevirir, maskeler ve onaya sunar.
+
+    Bu uc Gemini'yi hic cagirmiyor. Donen sey kullanicinin gorecegi
+    maskelenmis metin ve maskelenmesi onerilen adaylar.
+    """
+    from core.belge import adaylar as aday_bul
+    from core.belge import metne_cevir
+    from core.maskele import Maske
+
+    veri = await dosya.read()
+    if len(veri) > EN_BUYUK_BELGE:
+        raise HTTPException(413, "Dosya 10 MB'tan buyuk.")
+    try:
+        metin = metne_cevir(veri, dosya.filename or "")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc))
+    if not metin.strip():
+        raise HTTPException(422, "Belgeden metin cikarilamadi. "
+                                 "Taranmis (goruntu) PDF olabilir.")
+
+    maske = Maske()
+    onerilen = aday_bul(metin)
+    for tur, liste in onerilen.items():
+        for deger in liste:
+            maske.ekle(deger, tur)
+    maskeli = maske.maskele_degerler(maske.maskele(metin))
+
+    _maske_temizle()
+    oturum = secrets.token_urlsafe(16)
+    _MASKELER[oturum] = (time.time(), maske)
+
+    # ADAY DEGERLERI CEVABA KONMUYOR. Tarayici cogu zaman ayni
+    # makinede ama tunelden baglanildiginda cevap internete cikiyor;
+    # o durumda isim ve adresler de cikardi. Kullanicinin gormesi
+    # gereken sey zaten maskelenmis metin: bir sey gozden kacmissa
+    # metinde durur ve elle duzeltir. Boylece tanimlayici degerler
+    # HICBIR kosulda bu surecin disina cikmiyor.
+    return {
+        "oturum": oturum,
+        "maskeli": maskeli,
+        "ozet": maske.ozet(),
+        "karakter": len(metin),
+    }
+
+
+class BelgeAnaliz(BaseModel):
+    oturum: str
+    maskeli: str                      # kullanicinin duzenledigi hali
+    ek_gizli: list[str] = []          # elle isaretledigi ek degerler
+
+
+@app.post("/api/belge/analiz")
+def belge_analiz(istek: BelgeAnaliz):
+    """Onaylanmis MASKELI metinden meseleleri cikarip her birini arar."""
+    kayit = _MASKELER.get(istek.oturum)
+    if not kayit:
+        raise HTTPException(404, "Oturum bulunamadi ya da zaman asimina ugradi. "
+                                 "Belgeyi yeniden yukleyin.")
+    maske = kayit[1]
+    metin = istek.maskeli
+    for deger in istek.ek_gizli:
+        if deger.strip():
+            maske.ekle(deger.strip(), "KISI")
+    metin = maske.maskele_degerler(metin)
+
+    k = kaynaklar()
+    from core.mesele import meseleleri_ayir
+
+    meseleler = meseleleri_ayir(metin, k["generator"]) or []
+    if not meseleler:
+        raise HTTPException(422, "Belgeden ayri hukuki mesele cikarilamadi.")
+
+    bolumler = []
+    for mesele in meseleler:
+        maddeler = k["retriever"].ara(mesele, limit=5)
+        bolumler.append({
+            "mesele": mesele,
+            "maddeler": [{
+                "mevzuat_adi": m.get("mevzuat_adi"),
+                "mevzuat_no": m.get("mevzuat_no"),
+                "madde_no": m.get("madde_no"),
+                "baslik": m.get("baslik"),
+                "metin": (m.get("metin") or "")[:1200],
+                "mulga": m.get("mulga"),
+            } for m in maddeler],
+        })
+    return {"bolumler": bolumler, "mesele_sayisi": len(meseleler),
+            "ozet": maske.ozet()}
 
 
 class DahaKarar(BaseModel):

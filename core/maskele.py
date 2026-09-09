@@ -135,9 +135,19 @@ class Maske:
         return self._yer_tutucu(tur, deger)
 
     def maskele_degerler(self, metin: str) -> str:
-        """Elle eklenen degerleri metinde arayip degistirir."""
+        """Elle eklenen degerleri metinde arayip degistirir.
+
+        Duz str.replace YETMIYOR: tablodaki deger bosluklari tek bosluga
+        indirilmis halde tutuluyor, oysa PDF metninde ayni ad satir sonu
+        ya da cift bosluk tasiyabiliyor ("Ahmet\\nYılmaz"). Eslesme
+        bulunamayinca isim sessizce maskelenmeden disari giderdi.
+        Bu yuzden bosluklara toleransli desenle araniyor.
+        """
         for asil, yt in sorted(self._ters.items(), key=lambda x: -len(x[0])):
-            metin = metin.replace(asil, yt)
+            desen = r"\s+".join(re.escape(p) for p in asil.split(" ") if p)
+            if not desen:
+                continue
+            metin = re.sub(desen, yt.replace("\\", "\\\\"), metin)
         return metin
 
     def geri_koy(self, metin: str) -> str:

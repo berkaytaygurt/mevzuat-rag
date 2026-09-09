@@ -371,6 +371,71 @@
     letter-spacing: -.015em; line-height: 1;
   }
   .marka span { color: var(--vurgu); }
+  /* ---------- belge yukleme ve onay ---------- */
+  .belge-satiri {
+    display: flex; align-items: center; gap: 12px;
+    margin: 12px auto 0; max-width: 980px;
+  }
+  .belge-ac {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    padding: 7px 13px; color: var(--metin-orta);
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-radius: 2px; box-shadow: 1px 1px 3px var(--golge);
+  }
+  .belge-ac:hover { border-color: var(--vurgu); color: var(--vurgu); }
+  .belge-not { font-size: 11.5px; color: var(--metin-sol); }
+
+  .onay-kagit {
+    position: relative; background: #fdfaef;
+    padding: 20px 24px 22px; margin: 22px auto 0;
+    box-shadow: 0 1px 2px rgba(0,0,0,.14),
+                0 10px 16px -10px rgba(0,0,0,.36);
+  }
+  .onay-kagit h3 {
+    margin: 0 0 4px; font-family: var(--serif);
+    font-size: 17px; font-weight: 600;
+  }
+  /* Uyari susturulmuyor: avukat neyin disari gittigini bilerek
+     onaylamali. Av.K. m.36 ve KVKK bakimindan sorumluluk onda. */
+  .onay-uyari {
+    font-size: 12.5px; line-height: 1.55; color: var(--uyari);
+    background: var(--uyari-bg); border-left: 3px solid var(--uyari);
+    padding: 9px 12px; margin: 10px 0 14px;
+  }
+  .gizli-liste {
+    display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;
+  }
+  .gizli-etiket {
+    font-size: 11.5px; font-family: var(--daktilo);
+    background: var(--vurgu-bg); color: var(--vurgu);
+    border: 1px solid #c8d4e6; border-radius: 2px; padding: 3px 7px;
+  }
+  .gizli-etiket b { font-weight: 700; }
+  #maskeliMetin {
+    width: 100%; box-sizing: border-box; min-height: 220px;
+    font-family: var(--daktilo); font-size: 12px; line-height: 1.55;
+    color: var(--metin); background: var(--bg);
+    border: 1px solid var(--kenar); border-radius: 2px;
+    padding: 12px 14px; resize: vertical;
+  }
+  #maskeliMetin:focus { outline: none; border-color: var(--vurgu); }
+  .onay-alt {
+    display: flex; align-items: center; gap: 14px; margin-top: 14px;
+    flex-wrap: wrap;
+  }
+  .onay-gonder {
+    font: inherit; font-size: 13.5px; cursor: pointer;
+    padding: 9px 18px; color: #fff; background: var(--vurgu);
+    border: none; border-radius: 3px;
+  }
+  .onay-gonder:disabled { opacity: .45; cursor: default; }
+  .onay-vazgec {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    background: none; border: 0; color: var(--metin-sol);
+    text-decoration: underline;
+  }
+  .onay-ipucu { font-size: 11.5px; color: var(--metin-sol); }
+
   .ipucu-satiri {
     margin-top: 12px; padding-top: 11px;
     border-top: 1px solid var(--kenar-ince);
@@ -1111,6 +1176,15 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
            stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M12 5l7 7-7 7"/></svg>
     </button>
+  </div>
+
+  <!-- Belge yukleme. Dosya SUNUCUYA degil KENDI BILGISAYARINA gidiyor
+       (sunucu zaten avukatin makinesi); metin cikarma ve maskeleme
+       orada yapiliyor, disariya ancak onayladigi maskeli metin cikiyor. -->
+  <div class="belge-satiri">
+    <input type="file" id="belgeGirdi" accept=".pdf,.txt,.md" hidden>
+    <button class="belge-ac" id="belgeAc">Belge yükle</button>
+    <span class="belge-not">PDF veya TXT · dilekçe, bilirkişi raporu, karar</span>
   </div>
 
 
@@ -2325,6 +2399,140 @@ kenarAcEl.onclick = function () { kenarDurum(false); };
 try {
   if (localStorage.getItem("aibars.kenar") === "kapali") kenarDurum(true);
 } catch (e) { /* yoksay */ }
+
+/* ---------------- BELGE YUKLEME ----------------
+   Iki adim, cunku tek adim olamaz: avukat neyin disari gittigini
+   GORMEDEN gondermemeli. Dosya once yerelde metne cevrilip
+   maskeleniyor, ekranda gosteriliyor, ancak onaydan sonra Gemini'ye
+   gidiyor. Esleme tablosu sunucunun (yani bu bilgisayarin)
+   bellegindeki oturumda kaliyor. */
+let belgeOturum = null;
+
+document.getElementById("belgeAc").onclick = function () {
+  document.getElementById("belgeGirdi").click();
+};
+
+document.getElementById("belgeGirdi").onchange = async function (e) {
+  const dosya = e.target.files && e.target.files[0];
+  if (!dosya) return;
+  e.target.value = "";                       // ayni dosya tekrar secilebilsin
+  const gec = konusmaEkle('<div class="yukleniyor"><span class="yuk-metin">' +
+    kacis(dosya.name) + " okunuyor</span></div>", "gecici");
+  blogaKaydir(gec);
+  try {
+    const form = new FormData();
+    form.append("dosya", dosya);
+    const r = await fetch("api/belge", { method: "POST", body: form });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    belgeCiz(await r.json(), dosya.name);
+  } catch (hata) {
+    konusmaEkle('<div class="hata">Belge okunamadı.<code>' +
+      kacis(hata.message) + "</code></div>", "gecici");
+  }
+};
+
+function belgeCiz(d, dosyaAdi) {
+  belgeOturum = d.oturum;
+  const turAdi = { KISI: "kişi", ADRES: "adres", KURUM: "kurum",
+                   TCKN: "TC kimlik", IBAN: "IBAN", TEL: "telefon",
+                   EPOSTA: "e-posta", PLAKA: "plaka" };
+  let etiketler = "";
+  Object.keys(d.ozet || {}).forEach(function (tur) {
+    etiketler += '<span class="gizli-etiket"><b>' + d.ozet[tur] + "</b> " +
+      kacis(turAdi[tur] || tur) + "</span>";
+  });
+  if (!etiketler) {
+    etiketler = '<span class="gizli-etiket">gizlenecek bir şey bulunamadı</span>';
+  }
+
+  const h =
+    '<div class="onay-kagit">' +
+      "<h3>Gönderilmeden önce kontrol edin</h3>" +
+      '<div class="onay-uyari"><b>Aşağıdaki metin Google\'a (Gemini) ' +
+        "gönderilecek.</b> Köşeli parantezli yer tutucular bu " +
+        "bilgisayarda kalır, karşılıkları dışarı çıkmaz. Yine de " +
+        "olayın kendisi kimliği ele verebilir: bu bir gizleme " +
+        "işlemidir, anonimleştirme değil.</div>" +
+      '<div class="gizli-liste">' + etiketler + "</div>" +
+      '<textarea id="maskeliMetin" spellcheck="false">' +
+        kacis(d.maskeli) + "</textarea>" +
+      '<div class="onay-alt">' +
+        '<button class="onay-gonder" id="onayGonder">Onayla ve analiz et</button>' +
+        '<button class="onay-vazgec" id="onayVazgec">Vazgeç</button>' +
+        '<span class="onay-ipucu">Gözden kaçan bir isim varsa metinde ' +
+          "doğrudan düzeltebilirsiniz.</span>" +
+      "</div>" +
+    "</div>";
+
+  const blok = konusmaEkle(h);
+  blok.querySelector("#onayVazgec").onclick = function () {
+    blok.remove();
+    belgeOturum = null;
+  };
+  blok.querySelector("#onayGonder").onclick = function () {
+    belgeAnaliz(blok, dosyaAdi);
+  };
+  blogaKaydir(blok);
+}
+
+async function belgeAnaliz(blok, dosyaAdi) {
+  const dugme = blok.querySelector("#onayGonder");
+  const metin = blok.querySelector("#maskeliMetin").value;
+  dugme.disabled = true;
+  dugme.textContent = "Analiz ediliyor…";
+  try {
+    const r = await fetch("api/belge/analiz", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ oturum: belgeOturum, maskeli: metin }),
+    });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    const d = await r.json();
+    blok.remove();
+    raporCiz(d, dosyaAdi);
+  } catch (hata) {
+    dugme.disabled = false;
+    dugme.textContent = "Onayla ve analiz et";
+    konusmaEkle('<div class="hata">Analiz edilemedi.<code>' +
+      kacis(hata.message) + "</code></div>", "gecici");
+  }
+}
+
+function raporCiz(d, dosyaAdi) {
+  let h = '<div class="ozet-kagit">' +
+    '<div class="sorulan"><span class="sorulan-etiket">Belge</span>' +
+    kacis(dosyaAdi || "yüklenen belge") + "</div>" +
+    '<div class="kayitli-serit">' + d.mesele_sayisi +
+    " hukuki mesele bulundu · belge bu bilgisayardan çıkmadı</div></div>";
+
+  let sira = 0;
+  d.bolumler.forEach(function (b) {
+    h += '<div class="grup-basligi">' + kacis(b.mesele) +
+         '<span class="grup-sayi">' + b.maddeler.length + "</span></div>";
+    b.maddeler.forEach(function (m) {
+      const kimlik = (m.mevzuat_no || m.mevzuat_adi || "") + "#" + (m.madde_no || "");
+      h += '<div class="madde n' + ((sira++ % 6) + 1) + '">' +
+        '<div class="madde-bas" onclick="this.parentNode.classList.toggle(\'acik\')">' +
+          '<span class="ok">▶</span>' +
+          '<span class="madde-no">m.' + kacis(m.madde_no || "-") + "</span>" +
+          '<span class="madde-baslik">' + kacis(m.baslik || "") + "</span>" +
+          isaretDugmesi("madde", kimlik) +
+        "</div>" +
+        '<div class="madde-govde">' +
+          '<div class="madde-kaynak">' + kacis(m.mevzuat_adi || "") + "</div>" +
+          fikralara(m.metin || "") +
+        "</div></div>";
+    });
+  });
+  const blok = konusmaEkle(h);
+  blogaKaydir(blok);
+}
 
 document.getElementById("dosyaEkle").onclick = function () {
   // Kullanici "tek sohbet = tek dosya, yeni sohbet gelince yeni dosya"
