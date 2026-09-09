@@ -371,6 +371,82 @@
     letter-spacing: -.015em; line-height: 1;
   }
   .marka span { color: var(--vurgu); }
+  /* ---------- arama modu ---------- */
+  .arama-mod {
+    display: flex; align-items: center; gap: 8px;
+    margin: 0 auto 10px; max-width: 980px; flex-wrap: wrap;
+  }
+  .mod {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    padding: 6px 13px; color: var(--metin-sol);
+    background: transparent; border: 1px solid transparent;
+    border-radius: 2px;
+  }
+  .mod:hover { color: var(--metin-orta); }
+  .mod.secili {
+    background: var(--yuzey); color: var(--metin);
+    border-color: var(--kenar); font-weight: 600;
+    box-shadow: 1px 1px 3px var(--golge);
+  }
+  .mod-not { font-size: 11.5px; color: var(--metin-sol); margin-left: 4px; }
+
+  /* ---------- arsiv sonuclari: post-it ---------- */
+  .arsiv-baslik {
+    max-width: 980px; margin: 0 auto 4px; font-size: 12.5px;
+    color: var(--metin-orta);
+  }
+  .arsiv-ipucu {
+    max-width: 980px; margin: 0 auto 16px; font-size: 11.5px;
+    color: var(--metin-sol);
+  }
+  /* Kagit post-it: baslik + ALINTI birlikte. Katlanmiyor -- avukat
+     dosyayi ancak paragrafi okuyunca taniyor, dosya adi yetmiyor. */
+  .bulunan {
+    position: relative; max-width: 980px; margin: 0 auto 14px;
+    padding: 14px 18px 16px;
+    box-shadow: 2px 3px 7px rgba(60,50,30,.26);
+    transition: transform .16s cubic-bezier(.2,.8,.3,1), box-shadow .16s;
+  }
+  .bulunan:hover {
+    transform: translateY(-2px) rotate(-.25deg);
+    box-shadow: 3px 6px 13px rgba(60,50,30,.32);
+  }
+  .bulunan.n1 { background: var(--not-sari); }
+  .bulunan.n2 { background: var(--not-mavi); }
+  .bulunan.n3 { background: var(--not-yesil); }
+  .bulunan.n4 { background: var(--not-pembe); }
+  .bulunan.n5 { background: var(--not-turuncu); }
+  .bulunan.n6 { background: var(--not-mor); }
+  /* Kivrilan kose */
+  .bulunan::after {
+    content: ""; position: absolute; right: 0; bottom: 0;
+    width: 0; height: 0; pointer-events: none;
+    border-style: solid; border-width: 0 0 18px 18px;
+    border-color: transparent transparent var(--bg) transparent;
+    filter: drop-shadow(-2px -2px 3px rgba(0,0,0,.22));
+  }
+  .bulunan-bas {
+    display: flex; align-items: baseline; justify-content: space-between;
+    gap: 12px; margin-bottom: 8px; flex-wrap: wrap;
+  }
+  .bulunan-ad {
+    font-family: var(--daktilo); font-size: 12.5px; font-weight: 700;
+    color: #22292f;
+  }
+  .bulunan-bolum {
+    font-family: var(--daktilo); font-size: 10.5px; letter-spacing: .06em;
+    color: rgba(34,41,47,.62); text-transform: uppercase;
+  }
+  .bulunan-alinti {
+    font-size: 13.5px; line-height: 1.6; color: #262c33;
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .bulunan-alinti mark {
+    background: linear-gradient(transparent 55%, rgba(255,214,0,.62) 55%);
+    color: inherit; padding: 0 1px;
+    -webkit-box-decoration-break: clone; box-decoration-break: clone;
+  }
+
   /* ---------- belge yukleme ve onay ---------- */
   /* Klasik birakma alani. Once kucuk bir dugmeydi ve arama kutusunun
      bandi uzerine biniyordu; ayrica "buraya dilekce birak" cagrisini
@@ -1236,6 +1312,15 @@
     </div>
   </div>
 
+  <!-- Iki ayri arama. Mevzuat: "hangi madde gecerli". Arsiv: "hangi
+       dosyamda bundan bahsetmisim". Arsiv tarafi HIC BULUTA CIKMIYOR --
+       sorgu yerelde gomuye cevrilip yerel indekste araniyor. -->
+  <div class="arama-mod" role="tablist">
+    <button class="mod secili" data-mod="mevzuat" role="tab">Mevzuatta ara</button>
+    <button class="mod" data-mod="arsiv" role="tab">Kendi dosyalarımda ara</button>
+    <span class="mod-not" id="modNot"></span>
+  </div>
+
   <div class="arama">
     <textarea id="soru" rows="1" placeholder="Bir soru sorun…"></textarea>
     <button id="gonder" title="Sor">
@@ -1404,6 +1489,9 @@ async function sor(secilen, netlestirmeyiAtla) {
 
   const asil = soruEl.value.trim();
   if (!asil) return;
+  // Arsiv modunda mevzuat akisinin hicbir adimi calismiyor: ne
+  // netlestirme, ne HyDE, ne cevap uretimi. Yalnizca yerel arama.
+  if (aramaModu === "arsiv" && !secilen) { arsivAra(); return; }
   const soru = secilen || asil;
 
   gonderEl.disabled = true;
@@ -2478,6 +2566,122 @@ kenarAcEl.onclick = function () { kenarDurum(false); };
 try {
   if (localStorage.getItem("aibars.kenar") === "kapali") kenarDurum(true);
 } catch (e) { /* yoksay */ }
+
+/* ---------------- ARSIV ARAMASI ----------------
+   Buronun kendi belgelerinde arama. Mevzuattan iki farki var: birim
+   BELGE (parca degil) ve TEK BIR BULUT CAGRISI YOK -- sorgu yerelde
+   gomuye cevrilip yerel indekste araniyor, internetsiz calisir. */
+let aramaModu = "mevzuat";
+
+document.querySelectorAll(".mod").forEach(function (dugme) {
+  dugme.onclick = function () {
+    aramaModu = dugme.dataset.mod;
+    document.querySelectorAll(".mod").forEach(function (d) {
+      d.classList.toggle("secili", d === dugme);
+    });
+    soruEl.placeholder = aramaModu === "arsiv"
+      ? "Hangi dosyamda bundan bahsetmiştim…"
+      : "Bir soru sorun…";
+    modDurumu();
+    soruEl.focus();
+  };
+});
+
+async function modDurumu() {
+  const not = document.getElementById("modNot");
+  if (aramaModu !== "arsiv") { not.textContent = ""; return; }
+  not.textContent = "yükleniyor…";
+  try {
+    const r = await fetch("api/arsiv/durum");
+    const d = await r.json();
+    not.textContent = d.hazir
+      ? d.belge + " belge indekslendi · bu arama bilgisayarınızdan çıkmaz"
+      : "Henüz belge indekslenmedi.";
+  } catch (e) {
+    not.textContent = "durum okunamadı";
+  }
+}
+
+/* Sorgudaki anlamli kelimeleri alintida isaretler. Avukat neden bu
+   dosyanin geldigini gormeli; yoksa listeye guvenmiyor. */
+function alintiVurgula(alinti, soru) {
+  const atlanan = new Set(["hani", "bir", "olan", "icin", "için", "ile",
+    "daha", "sonra", "gibi", "kadar", "vardi", "vardı", "dosya", "dilekce",
+    "dilekçe", "istemistik", "istemiştik"]);
+  const kelimeler = (soru || "").toLowerCase().match(/[\wçğıöşüÇĞİÖŞÜ]+/g) || [];
+  const secilen = kelimeler.filter(function (k) {
+    return k.length > 3 && !atlanan.has(k);
+  });
+  if (!secilen.length) return kacis(alinti);
+  // Uzun kelime once: "savunmasini" isaretlenirken "savunma" parcayi
+  // bolmesin.
+  secilen.sort(function (a, b) { return b.length - a.length; });
+  let h = kacis(alinti);
+  secilen.slice(0, 12).forEach(function (k) {
+    // Turkce ekler: kokun ilk 5 harfini yakalayip devamini seriyoruz.
+    const kok = k.slice(0, Math.max(5, k.length - 3));
+    const desen = new RegExp("(" + kok.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") +
+      "[\\wçğıöşüÇĞİÖŞÜ]*)", "gi");
+    h = h.replace(desen, function (esl) {
+      return esl.indexOf("<") >= 0 ? esl : "<mark>" + esl + "</mark>";
+    });
+  });
+  return h;
+}
+
+async function arsivAra() {
+  const soru = soruEl.value.trim();
+  if (!soru) return;
+  gonderEl.disabled = true;
+  const gec = konusmaEkle('<div class="yukleniyor"><span class="yuk-metin">' +
+    "dosyalarınızda aranıyor</span></div>", "gecici");
+  blogaKaydir(gec);
+  try {
+    const r = await fetch("api/arsiv/ara", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ soru: soru, adet: 6 }),
+    });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    arsivCiz(await r.json());
+    soruEl.value = "";
+    boyutlandir();
+  } catch (hata) {
+    konusmaEkle('<div class="hata">Dosyalarda aranamadı.<code>' +
+      kacis(hata.message) + "</code></div>", "gecici");
+  } finally {
+    gonderEl.disabled = false;
+  }
+}
+
+function arsivCiz(d) {
+  if (!d.sonuclar || !d.sonuclar.length) {
+    konusmaEkle('<div class="bilgi">Bu tarife uyan bir dosya bulunamadı. ' +
+      "Olayı biraz daha ayrıntılı yazmayı deneyin.</div>");
+    return;
+  }
+  let h = '<div class="ozet-kagit"><div class="sorulan">' +
+    '<span class="sorulan-etiket">Aranan</span>' + kacis(d.soru) +
+    "</div></div>";
+  h += '<div class="arsiv-baslik"><b>' + d.sonuclar.length +
+       " dosya bulundu.</b> Aradığınız bu mu?</div>";
+  h += '<div class="arsiv-ipucu">Eşleşen paragraf altta; ' +
+       "tanıdığınız dosyayı açın.</div>";
+  d.sonuclar.forEach(function (s, i) {
+    h += '<div class="bulunan n' + ((i % 6) + 1) + '">' +
+      '<div class="bulunan-bas">' +
+        '<span class="bulunan-ad">' + kacis(s.belge) + "</span>" +
+        '<span class="bulunan-bolum">' + kacis(s.bolum || "belge") + "</span>" +
+      "</div>" +
+      '<div class="bulunan-alinti">' + alintiVurgula(s.alinti || "", d.soru) +
+      "</div></div>";
+  });
+  const blok = konusmaEkle(h);
+  blogaKaydir(blok);
+}
 
 /* ---------------- BELGE YUKLEME ----------------
    Iki adim, cunku tek adim olamaz: avukat neyin disari gittigini

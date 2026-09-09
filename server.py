@@ -549,6 +549,52 @@ def belge_analiz(istek: BelgeAnaliz):
             "ozet": maske.ozet()}
 
 
+# ---------------------------------------------------------------- arsiv
+# BURONUN KENDI BELGELERINDE ARAMA. Mevzuat aramasindan iki farki var:
+# birim BELGE (parca degil) ve BULUT CAGRISI YOK -- sorgu yerelde
+# gomuye cevrilip yerel indekste araniyor. Internetsiz calisir.
+_ARSIV = {}
+
+
+def _arsiv():
+    from core.arsiv import Arsiv
+
+    if "a" not in _ARSIV:
+        k = kaynaklar()
+        a = Arsiv(k["retriever"].embedder)
+        if not (a.dizin / "vektorler.npy").exists():
+            raise HTTPException(404, "Arsiv indeksi bulunamadi.")
+        a.yukle()
+        _ARSIV["a"] = a
+    return _ARSIV["a"]
+
+
+@app.get("/api/arsiv/durum")
+def arsiv_durum():
+    from core.arsiv import Arsiv
+
+    a = Arsiv(None)
+    if not (a.dizin / "parcalar.json").exists():
+        return {"hazir": False, "belge": 0, "parca": 0}
+    parcalar = json.loads((a.dizin / "parcalar.json").read_text("utf-8"))
+    return {"hazir": True, "parca": len(parcalar),
+            "belge": len({p["belge"] for p in parcalar})}
+
+
+class ArsivSorgu(BaseModel):
+    soru: str
+    adet: int = 6
+
+
+@app.post("/api/arsiv/ara")
+def arsiv_ara(istek: ArsivSorgu):
+    soru = (istek.soru or "").strip()
+    if not soru:
+        raise HTTPException(422, "Bos sorgu.")
+    sonuclar = _arsiv().ara(soru, limit=max(1, min(istek.adet, 20)))
+    return {"soru": soru, "sonuclar": sonuclar}
+
+
 class MaskeliPdf(BaseModel):
     metin: str
     ad: str = "maskeli-belge"
