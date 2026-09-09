@@ -390,6 +390,14 @@
   }
   .mod-not { font-size: 11.5px; color: var(--metin-sol); margin-left: 4px; }
 
+  /* ---------- arsiv paneli ---------- */
+  .arsiv-ilerleme {
+    max-width: 980px; margin: 8px auto 0; text-align: center;
+    font-size: 12px; color: var(--metin-sol); min-height: 16px;
+  }
+  .arsiv-ilerleme.hata { color: var(--vurgu); }
+  .arsiv-ilerleme.tamam { color: #1d6b52; font-weight: 600; }
+
   /* ---------- arsiv sonuclari: post-it ---------- */
   .arsiv-baslik {
     max-width: 980px; margin: 0 auto 4px; font-size: 12.5px;
@@ -437,10 +445,35 @@
     font-family: var(--daktilo); font-size: 10.5px; letter-spacing: .06em;
     color: rgba(34,41,47,.62); text-transform: uppercase;
   }
+  .bulunan { cursor: pointer; }
   .bulunan-alinti {
     font-size: 13.5px; line-height: 1.6; color: #262c33;
     white-space: pre-wrap; word-break: break-word;
   }
+  /* Acilinca tam bolum ve belgeyi acma dugmesi. Alinti dosyayi
+     TANITIYOR; karar vermek icin bolumun tamami gerekiyor. */
+  .bulunan-tam { display: none; }
+  .bulunan.acik .bulunan-tam { display: block; }
+  .bulunan.acik .bulunan-alinti { display: none; }
+  .bulunan-tam-metin {
+    font-size: 13px; line-height: 1.65; color: #262c33;
+    white-space: pre-wrap; word-break: break-word;
+    max-height: 340px; overflow-y: auto;
+    padding-right: 6px;
+  }
+  .bulunan-alt {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    margin-top: 12px; padding-top: 10px;
+    border-top: 1px solid rgba(0,0,0,.13);
+  }
+  .belge-ac-dugme {
+    font: inherit; font-size: 12.5px; cursor: pointer;
+    padding: 6px 12px; color: #22292f;
+    background: rgba(255,255,255,.72);
+    border: 1px solid rgba(0,0,0,.22); border-radius: 2px;
+  }
+  .belge-ac-dugme:hover { background: #fff; }
+  .bulunan-ipucu { font-size: 11.5px; color: rgba(34,41,47,.6); }
   .bulunan-alinti mark {
     background: linear-gradient(transparent 55%, rgba(255,214,0,.62) 55%);
     color: inherit; padding: 0 1px;
@@ -1319,6 +1352,34 @@
     <button class="mod secili" data-mod="mevzuat" role="tab">Mevzuatta ara</button>
     <button class="mod" data-mod="arsiv" role="tab">Kendi dosyalarımda ara</button>
     <span class="mod-not" id="modNot"></span>
+  </div>
+
+  <!-- Arsiv paneli yalnizca "kendi dosyalarim" modunda gorunur.
+       Klasor yolu SUNUCUYA yaziliyor ve dosyalar oradan okunuyor;
+       yani avukatin kendi diskinden. Tarayiciya yuklenmiyor. -->
+  <!-- Arsiv alani. Dilekce birakma alaniyla AYNI dili konusuyor:
+       yirtik kagit, bantli, ortali. Fark su: orada tek belge okunup
+       atiliyor, burada klasor kalici olarak indeksleniyor. -->
+  <div class="belge-sarmal" id="arsivPanel" hidden>
+    <span class="belge-bant sol" aria-hidden="true"></span>
+    <span class="belge-bant sag" aria-hidden="true"></span>
+    <div class="belge-alan" id="arsivAlan" tabindex="0" role="button">
+      <input type="file" id="arsivGirdi" webkitdirectory directory
+             multiple hidden>
+      <svg class="belge-simge" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="1.6" stroke-linecap="round"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+        <path d="M12 11v5"/><path d="M9.5 13.5 12 11l2.5 2.5"/>
+      </svg>
+      <div class="belge-baslik" id="arsivBaslik">Dilekçe klasörünüzü seçin</div>
+      <div class="belge-alt" id="arsivAlt">
+        Klasördeki PDF ve TXT dosyaları aranabilir hâle gelir
+      </div>
+      <div class="belge-guvence">Dosyalar bilgisayarınızda kalır;
+        bu arama hiçbir zaman internete çıkmaz.</div>
+    </div>
+    <div class="arsiv-ilerleme" id="arsivIlerleme"></div>
   </div>
 
   <div class="arama">
@@ -2589,6 +2650,13 @@ document.querySelectorAll(".mod").forEach(function (dugme) {
 
 async function modDurumu() {
   const not = document.getElementById("modNot");
+  // Iki panel ayni anda gorunmemeli: tek belge yukleme MEVZUAT
+  // akisinin parcasi (oku-analiz-at), arsiv paneli ise kalici indeks.
+  // Arsiv modunda ikisi birden cikinca kullanici hangisinin ne
+  // yaptigini anlamiyor.
+  document.getElementById("arsivPanel").hidden = aramaModu !== "arsiv";
+  const belgeSarmal = document.querySelector(".belge-sarmal:not(#arsivPanel)");
+  if (belgeSarmal) belgeSarmal.hidden = aramaModu === "arsiv";
   if (aramaModu !== "arsiv") { not.textContent = ""; return; }
   not.textContent = "yükleniyor…";
   try {
@@ -2597,9 +2665,98 @@ async function modDurumu() {
     not.textContent = d.hazir
       ? d.belge + " belge indekslendi · bu arama bilgisayarınızdan çıkmaz"
       : "Henüz belge indekslenmedi.";
+    // Sayfa yenilendiginde de HANGI klasorun indekslendigi gorunsun.
+    const klasorler = d.klasorler || [];
+    if (d.hazir && klasorler.length) {
+      const adlar = klasorler.map(function (k) { return k.ad; }).join(", ");
+      document.getElementById("arsivBaslik").textContent = adlar;
+      document.getElementById("arsivAlt").textContent =
+        d.belge + " belge hazır · başka klasör eklemek için tıklayın";
+    }
   } catch (e) {
     not.textContent = "durum okunamadı";
   }
+}
+
+const arsivAlanEl = document.getElementById("arsivAlan");
+const arsivGirdiEl = document.getElementById("arsivGirdi");
+
+arsivAlanEl.onclick = function () { arsivGirdiEl.click(); };
+arsivAlanEl.onkeydown = function (e) {
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); arsivGirdiEl.click(); }
+};
+
+arsivGirdiEl.onchange = async function (e) {
+  const hepsi = [...(e.target.files || [])];
+  e.target.value = "";
+  const bilgi = document.getElementById("arsivIlerleme");
+  const uygun = hepsi.filter(function (f) {
+    return /[.](pdf|txt|md)$/i.test(f.name);
+  });
+  if (!uygun.length) {
+    bilgi.className = "arsiv-ilerleme hata";
+    bilgi.textContent = hepsi.length
+      ? "Bu klasörde PDF veya TXT yok (" + hepsi.length + " dosyaya bakıldı)."
+      : "Klasör seçilmedi.";
+    return;
+  }
+  // Kullanici NE SECTIGINI gormeli; klasor adi dosya yolundan geliyor.
+  const klasor = (uygun[0].webkitRelativePath || "").split("/")[0] || "klasör";
+  document.getElementById("arsivBaslik").textContent = klasor;
+  document.getElementById("arsivAlt").textContent =
+    uygun.length + " belge seçildi · indeksleniyor";
+  bilgi.className = "arsiv-ilerleme";
+  bilgi.textContent = "belgeler okunuyor…";
+  arsivAlanEl.classList.add("uzerinde");
+
+  try {
+    const form = new FormData();
+    uygun.forEach(function (f) { form.append("dosyalar", f, f.name); });
+    form.append("klasor", klasor);
+    const r = await fetch("api/arsiv/yukle", { method: "POST", body: form });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    arsivIlerlemeIzle(bilgi, klasor, uygun.length);
+  } catch (hata) {
+    arsivAlanEl.classList.remove("uzerinde");
+    bilgi.className = "arsiv-ilerleme hata";
+    bilgi.textContent = hata.message;
+  }
+};
+
+/* Indeksleme dakikalar surebiliyor; arayuz ilerlemeyi soruyor.
+   Tek istekle beklenseydi zaman asimina ugrardi. */
+function arsivIlerlemeIzle(bilgi, klasor, adet) {
+  const sayac = setInterval(async function () {
+    let d;
+    try {
+      d = await (await fetch("api/arsiv/ilerleme")).json();
+    } catch (e) { return; }
+    if (d.durum === "okunuyor") {
+      bilgi.textContent = "belgeler okunuyor… " + d.okunan + "/" + d.toplam;
+    } else if (d.durum === "gomuluyor") {
+      bilgi.textContent = "indeks kuruluyor — bu kısım biraz sürer";
+    } else if (d.durum === "bitti") {
+      clearInterval(sayac);
+      arsivAlanEl.classList.remove("uzerinde");
+      // Avukat NE SECTIGINI ve SIRADA NE OLDUGUNU gormeli.
+      document.getElementById("arsivBaslik").textContent = klasor + " hazır";
+      document.getElementById("arsivAlt").textContent =
+        "Hangi dilekçeyi arıyorsunuz? Aşağıya birkaç cümleyle yazın.";
+      bilgi.className = "arsiv-ilerleme tamam";
+      bilgi.textContent = "✓ " + adet + " belge indekslendi" +
+        (d.atlanan ? " · " + d.atlanan + " dosya okunamadı" : "");
+      modDurumu();
+      soruEl.focus();
+    } else if (d.durum === "hata") {
+      clearInterval(sayac);
+      arsivAlanEl.classList.remove("uzerinde");
+      bilgi.className = "arsiv-ilerleme hata";
+      bilgi.textContent = d.hata || "indeksleme başarısız";
+    }
+  }, 1200);
 }
 
 /* Sorgudaki anlamli kelimeleri alintida isaretler. Avukat neden bu
@@ -2671,15 +2828,41 @@ function arsivCiz(d) {
   h += '<div class="arsiv-ipucu">Eşleşen paragraf altta; ' +
        "tanıdığınız dosyayı açın.</div>";
   d.sonuclar.forEach(function (s, i) {
-    h += '<div class="bulunan n' + ((i % 6) + 1) + '">' +
+    const acilabilir = s.acilabilir
+      ? '<button class="belge-ac-dugme" data-belge="' + kacis(s.belge) +
+        '">Belgeyi aç</button>'
+      : '<span class="bulunan-ipucu">belge saklanmamış</span>';
+    h += '<div class="bulunan n' + ((i % 6) + 1) +
+         '" data-bulunan="' + i + '">' +
       '<div class="bulunan-bas">' +
         '<span class="bulunan-ad">' + kacis(s.belge) + "</span>" +
         '<span class="bulunan-bolum">' + kacis(s.bolum || "belge") + "</span>" +
       "</div>" +
       '<div class="bulunan-alinti">' + alintiVurgula(s.alinti || "", d.soru) +
+      "</div>" +
+      '<div class="bulunan-tam">' +
+        '<div class="bulunan-tam-metin">' +
+          alintiVurgula(s.tam_bolum || s.alinti || "", d.soru) +
+        "</div>" +
+        '<div class="bulunan-alt">' + acilabilir +
+          '<span class="bulunan-ipucu">kapatmak için post-it&rsquo;e tıklayın</span>' +
+        "</div>" +
       "</div></div>";
   });
   const blok = konusmaEkle(h);
+  blok.addEventListener("click", function (e) {
+    const dugme = e.target.closest("[data-belge]");
+    if (dugme) {
+      // Belge YENI SEKMEDE aciliyor: post-it listesi kaybolmasin,
+      // avukat digerlerine de bakabilsin.
+      e.stopPropagation();
+      window.open("api/arsiv/belge?ad=" +
+        encodeURIComponent(dugme.dataset.belge), "_blank");
+      return;
+    }
+    const kart = e.target.closest("[data-bulunan]");
+    if (kart) kart.classList.toggle("acik");
+  });
   blogaKaydir(blok);
 }
 

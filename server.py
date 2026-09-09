@@ -19,6 +19,7 @@ import logging
 import os
 import re
 import secrets
+import threading
 import time
 from pathlib import Path
 
@@ -569,16 +570,278 @@ def _arsiv():
     return _ARSIV["a"]
 
 
+def _klasor_kaydi(dizin, klasor: str | None = None, adet: int = 0) -> list:
+    """Indekslenen klasorleri hatirlar.
+
+    Sayfa yenilenince avukat HANGI klasoru indeksledigini goremiyordu;
+    yalnizca belge sayisi yaziyordu. Klasor adi indekste tutulmuyor
+    (parcalar yalnizca dosya adi tasiyor), o yuzden ayri bir kayit.
+    """
+    yol = dizin / "klasorler.json"
+    kayit = []
+    if yol.exists():
+        try:
+            kayit = json.loads(yol.read_text("utf-8"))
+        except Exception:
+            kayit = []
+    if klasor:
+        kayit = [k for k in kayit if k.get("ad") != klasor]
+        kayit.append({"ad": klasor, "adet": adet, "zaman": time.time()})
+        yol.parent.mkdir(parents=True, exist_ok=True)
+        yol.write_text(json.dumps(kayit, ensure_ascii=False), encoding="utf-8")
+    return kayit
+
+
 @app.get("/api/arsiv/durum")
 def arsiv_durum():
     from core.arsiv import Arsiv
 
     a = Arsiv(None)
     if not (a.dizin / "parcalar.json").exists():
-        return {"hazir": False, "belge": 0, "parca": 0}
+        return {"hazir": False, "belge": 0, "parca": 0, "klasorler": []}
     parcalar = json.loads((a.dizin / "parcalar.json").read_text("utf-8"))
     return {"hazir": True, "parca": len(parcalar),
-            "belge": len({p["belge"] for p in parcalar})}
+            "belge": len({p["belge"] for p in parcalar}),
+            "klasorler": _klasor_kaydi(a.dizin)}
+
+
+# Indeksleme UZUN SURUYOR (159 belge 37 saniye; bin belgelik bir buro
+# arsivi dakikalar alir), o yuzden arka planda calisiyor ve arayuz
+# ilerlemeyi soruyor. Senkron yapilsaydi istek zaman asimina ugrardi.
+_ARSIV_IS = {"durum": "bos", "toplam": 0, "okunan": 0,
+             "atlanan": 0, "hata": None}
+
+
+class ArsivKlasor(BaseModel):
+    klasor: str
+    ekle: bool = True          # False ise indeks bastan kurulur
+
+
+def _arsiv_indeksle_calis(klasor: str, ekle: bool) -> None:
+    from core.arsiv import Arsiv
+    from core.belge import metne_cevir
+
+    try:
+        kok = Path(klasor).expanduser()
+        if not kok.is_dir():
+            _ARSIV_IS.update(durum="hata", hata="Klasor bulunamadi: %s" % kok)
+            return
+
+        dosyalar = [y for y in sorted(kok.rglob("*"))
+                    if y.suffix.lower() in (".pdf", ".txt", ".md")
+                    and y.is_file()]
+        _ARSIV_IS.update(durum="okunuyor", toplam=len(dosyalar),
+                         okunan=0, atlanan=0, hata=None)
+        if not dosyalar:
+            _ARSIV_IS.update(durum="hata",
+                             hata="Klasorde PDF ya da TXT bulunamadi.")
+            return
+
+        k = kaynaklar()
+        arsiv = Arsiv(k["retriever"].embedder)
+        # Ekleme modunda once mevcut indeks yukleniyor; yoksa her klasor
+        # oncekini siler ve avukat bir onceki arsivini kaybeder.
+        eskiler: dict[str, str] = {}
+        if ekle and (arsiv.dizin / "parcalar.json").exists():
+            arsiv.yukle()
+            for p in arsiv._parcalar:
+                eskiler.setdefault(p["belge"], None)
+
+        metinler: dict[str, str] = {}
+        for yol in dosyalar:
+            try:
+                metin = metne_cevir(yol.read_bytes(), yol.name)
+            except Exception:
+                _ARSIV_IS["atlanan"] += 1
+                continue
+            if metin.strip():
+                # Ayni adli iki dosya farkli klasorlerde olabilir
+                metinler[str(yol.relative_to(kok))] = metin
+            else:
+                _ARSIV_IS["atlanan"] += 1
+            _ARSIV_IS["okunan"] += 1
+
+        if not metinler:
+            _ARSIV_IS.update(durum="hata",
+                             hata="Hicbir dosyadan metin cikarilamadi "
+                                  "(taranmis PDF olabilir).")
+            return
+
+        if eskiler:
+            # Eski parcalarin METNI elimizde degil, yalnizca indeks var.
+            # Basit ve dogru olan: eski belgeleri de yeniden okumak
+            # yerine yeni klasoru mevcut indekse EKLEMEK icin eski
+            # parcalari koruyup uzerine yaziyoruz.
+            eski_parcalar = list(arsiv._parcalar)
+            eski_vektorler = arsiv._vektorler
+            _ARSIV_IS["durum"] = "gomuluyor"
+            arsiv.indeksle(metinler, goster=False)
+            import numpy as _np
+            arsiv._parcalar = eski_parcalar + arsiv._parcalar
+            arsiv._vektorler = _np.vstack([eski_vektorler, arsiv._vektorler])
+            _np.save(arsiv.dizin / "vektorler.npy", arsiv._vektorler)
+            (arsiv.dizin / "parcalar.json").write_text(
+                json.dumps(arsiv._parcalar, ensure_ascii=False),
+                encoding="utf-8")
+        else:
+            _ARSIV_IS["durum"] = "gomuluyor"
+            arsiv.indeksle(metinler, goster=False)
+
+        _ARSIV.pop("a", None)          # onbellek tazelensin
+        _ARSIV_IS.update(durum="bitti")
+    except Exception as exc:
+        log.exception("arsiv indekslenemedi")
+        _ARSIV_IS.update(durum="hata", hata=str(exc)[:200])
+
+
+@app.post("/api/arsiv/indeksle")
+def arsiv_indeksle(istek: ArsivKlasor):
+    """Bir klasordeki belgeleri arka planda indeksler.
+
+    Dosyalar SUNUCUNUN diskinden okunuyor -- yani avukatin kendi
+    makinesinden. Tarayiciya yuklenmiyor, disariya gonderilmiyor.
+    """
+    if _ARSIV_IS["durum"] in ("okunuyor", "gomuluyor"):
+        raise HTTPException(409, "Zaten bir indeksleme suruyor.")
+    klasor = (istek.klasor or "").strip().strip('"')
+    if not klasor:
+        raise HTTPException(422, "Klasor yolu bos.")
+    _ARSIV_IS.update(durum="okunuyor", toplam=0, okunan=0,
+                     atlanan=0, hata=None)
+    threading.Thread(target=_arsiv_indeksle_calis,
+                     args=(klasor, istek.ekle), daemon=True).start()
+    return {"baslatildi": True}
+
+
+def _arsiv_yukle_calis(belgeler: dict) -> None:
+    """Tarayicidan gelen dosyalari indekse ekler."""
+    from core.arsiv import Arsiv
+
+    try:
+        k = kaynaklar()
+        arsiv = Arsiv(k["retriever"].embedder)
+        eski_parcalar, eski_vektorler = [], None
+        if (arsiv.dizin / "parcalar.json").exists():
+            arsiv.yukle()
+            eski_parcalar = [p for p in arsiv._parcalar
+                             if p["belge"] not in belgeler]
+            if len(eski_parcalar) == len(arsiv._parcalar):
+                eski_vektorler = arsiv._vektorler
+            else:
+                # Ayni adli belge yeniden yuklendi: eskisi dusuyor.
+                import numpy as _np
+                tut = [i for i, p in enumerate(arsiv._parcalar)
+                       if p["belge"] not in belgeler]
+                eski_vektorler = arsiv._vektorler[tut] if tut else None
+                eski_parcalar = [arsiv._parcalar[i] for i in tut]
+
+        _ARSIV_IS["durum"] = "gomuluyor"
+        arsiv.indeksle(belgeler, goster=False)
+        if eski_parcalar and eski_vektorler is not None:
+            import numpy as _np
+            arsiv._parcalar = eski_parcalar + arsiv._parcalar
+            arsiv._vektorler = _np.vstack([eski_vektorler, arsiv._vektorler])
+            _np.save(arsiv.dizin / "vektorler.npy", arsiv._vektorler)
+            (arsiv.dizin / "parcalar.json").write_text(
+                json.dumps(arsiv._parcalar, ensure_ascii=False),
+                encoding="utf-8")
+        _ARSIV.pop("a", None)
+        _ARSIV_IS.update(durum="bitti")
+    except Exception as exc:
+        log.exception("arsiv yuklenemedi")
+        _ARSIV_IS.update(durum="hata", hata=str(exc)[:200])
+
+
+@app.post("/api/arsiv/yukle")
+async def arsiv_yukle(dosyalar: list[UploadFile] = File(...),
+                      klasor: str = Form("")):
+    """Tarayicidan secilen klasorun dosyalarini indeksler.
+
+    Klasor SECIMI tarayicidan geliyor cunku tarayici bir klasorun tam
+    yolunu vermiyor; dosyalarin kendisi geliyor. Sunucu zaten avukatin
+    makinesi oldugu icin veri bilgisayardan cikmis olmuyor.
+    """
+    from core.belge import metne_cevir
+
+    if _ARSIV_IS["durum"] in ("okunuyor", "gomuluyor"):
+        raise HTTPException(409, "Zaten bir indeksleme suruyor.")
+
+    _ARSIV_IS.update(durum="okunuyor", toplam=len(dosyalar), okunan=0,
+                     atlanan=0, hata=None)
+    # Orijinaller saklaniyor: avukat post-it'e tiklayinca BELGEYI
+    # acabilmeli. Yalnizca metni tutsaydik "bu dosya" deyip
+    # gosteremezdik -- tarayici bir klasorun tam yolunu vermiyor, yani
+    # dosyayi diskte yeniden bulmanin yolu yok.
+    from core.arsiv import Arsiv
+    saklama = Arsiv(None).dizin / "belgeler"
+    saklama.mkdir(parents=True, exist_ok=True)
+
+    belgeler: dict[str, str] = {}
+    for dosya in dosyalar:
+        ad = dosya.filename or ""
+        try:
+            veri = await dosya.read()
+            if len(veri) > EN_BUYUK_BELGE:
+                _ARSIV_IS["atlanan"] += 1
+                continue
+            metin = metne_cevir(veri, ad)
+        except Exception:
+            _ARSIV_IS["atlanan"] += 1
+            continue
+        if metin.strip():
+            try:
+                (saklama / _guvenli_ad(ad)).write_bytes(veri)
+            except Exception:
+                log.warning("belge saklanamadi: %s", ad)
+        if metin.strip():
+            belgeler[ad] = metin
+        else:
+            _ARSIV_IS["atlanan"] += 1
+        _ARSIV_IS["okunan"] += 1
+
+    if not belgeler:
+        _ARSIV_IS.update(durum="hata",
+                         hata="Hicbir dosyadan metin cikarilamadi "
+                              "(taranmis PDF olabilir).")
+        raise HTTPException(422, _ARSIV_IS["hata"])
+
+    if klasor.strip():
+        from core.arsiv import Arsiv
+        _klasor_kaydi(Arsiv(None).dizin, klasor.strip(), len(belgeler))
+    threading.Thread(target=_arsiv_yukle_calis, args=(belgeler,),
+                     daemon=True).start()
+    return {"baslatildi": True, "okunan": len(belgeler),
+            "atlanan": _ARSIV_IS["atlanan"]}
+
+
+def _guvenli_ad(ad: str) -> str:
+    """Dosya adini saklamaya uygun hale getirir.
+
+    Ad tarayicidan geliyor; yol ayraci ve ".." tasiyabilir. Diske
+    yazdigimiz icin burada gevsek davranmak dizin disina yazma
+    demek olurdu.
+    """
+    temiz = re.sub(r"[^A-Za-z0-9._ğüşıöçĞÜŞİÖÇ -]+", "_", ad)
+    temiz = re.sub(r"\.{2,}", ".", temiz).strip("._ ")
+    return temiz[:120] or "belge"
+
+
+@app.get("/api/arsiv/belge")
+def arsiv_belge(ad: str):
+    """Indekslenmis belgenin kendisini doner (tarayicida acilir)."""
+    from core.arsiv import Arsiv
+
+    yol = Arsiv(None).dizin / "belgeler" / _guvenli_ad(ad)
+    if not yol.is_file():
+        raise HTTPException(404, "Belge saklanmamis.")
+    tur = ("application/pdf" if yol.suffix.lower() == ".pdf"
+           else "text/plain; charset=utf-8")
+    return FileResponse(yol, media_type=tur, filename=yol.name)
+
+
+@app.get("/api/arsiv/ilerleme")
+def arsiv_ilerleme():
+    return _ARSIV_IS
 
 
 class ArsivSorgu(BaseModel):
@@ -592,6 +855,10 @@ def arsiv_ara(istek: ArsivSorgu):
     if not soru:
         raise HTTPException(422, "Bos sorgu.")
     sonuclar = _arsiv().ara(soru, limit=max(1, min(istek.adet, 20)))
+    from core.arsiv import Arsiv
+    saklama = Arsiv(None).dizin / "belgeler"
+    for s in sonuclar:
+        s["acilabilir"] = (saklama / _guvenli_ad(s["belge"])).is_file()
     return {"soru": soru, "sonuclar": sonuclar}
 
 

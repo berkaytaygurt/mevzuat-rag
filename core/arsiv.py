@@ -75,6 +75,34 @@ TARAF_BOLUMLERI = {
     "ŞİKAYETÇİ", "SIKAYETCI", "MAĞDUR", "MAGDUR", "ADRES", "TELEFON",
 }
 
+# Alakasiz sonuclar elenmeli. Olculdu (3 belgelik kucuk arsiv):
+#   ilgili sorgu   -> dogru belge 0.699, digerleri 0.31-0.38
+#   alakasiz sorgu -> hepsi 0.23-0.33
+# Esik olmadan alakasiz bir sorguda da "3 dosya bulundu, aradiginiz bu
+# mu?" yaziyordu -- kullaniciya olmayan bir sey vaat etmek.
+# 0.40 secildi: 159 belgelik olcumde kapsama@10'u dusurmuyor
+# (127/159 ayni kaldi) ama celp gurultusunu kesiyor.
+EN_AZ_BENZERLIK = 0.40
+
+# RRF agirliklari. OLCULDU ve KLASIK DEGERDE BIRAKILDI.
+#
+# Tek bir sorguda BM25 belirgin sekilde yaniltti ("kirasini odemeyen
+# kiraciyi cikarmak" -> borclar dilekcelerini one aldi; saf vektor ise
+# dogru dosyayi 1. siraya koyuyordu). Vektore agirlik vermek akla
+# yatkin gorundu, 40 sorguluk sette denendi:
+#
+#   agirlik   temiz MRR   konusma MRR
+#   1.0         0.791        0.789
+#   1.5         0.789        0.795
+#   2.0         0.795        0.764
+#   3.0         0.804        0.774
+#
+# Fark gurultunun icinde; net kazanan yok. Yani o sorgu sistematik bir
+# sorun degil, tek bir ornekti. Olculmus bir sebep olmadan klasik
+# degerden sapmiyoruz.
+VEKTOR_AGIRLIGI = 1.0
+BM25_AGIRLIGI = 1.0
+
 EN_AZ_PARCA = 120          # bundan kisa parca aramaya bir sey katmiyor
 EN_COK_PARCA = 1400        # gomme modelinin penceresini zorlamamak icin
 
@@ -349,9 +377,9 @@ class Arsiv:
         K = 60
         puanlar: dict[int, float] = {}
         for r, i in enumerate(vektor_sira):
-            puanlar[int(i)] = puanlar.get(int(i), 0.0) + 1.0 / (K + r)
+            puanlar[int(i)] = puanlar.get(int(i), 0.0) + VEKTOR_AGIRLIGI / (K + r)
         for r, i in enumerate(bm_sira):
-            puanlar[int(i)] = puanlar.get(int(i), 0.0) + 1.0 / (K + r)
+            puanlar[int(i)] = puanlar.get(int(i), 0.0) + BM25_AGIRLIGI / (K + r)
 
         # Belge duzeyinde topla: EN IYI parca belgeyi temsil ediyor.
         belgeler: dict[str, dict] = {}
@@ -366,6 +394,14 @@ class Arsiv:
                     # Avukat alintiyi okuyup dosyayi TANIYACAK; hem
                     # yeterince uzun hem ESLESEN yerden olmali.
                     "alinti": alinti_sec(p["metin"], soru),
+                    # Tam bolum: post-it acilinca gosteriliyor. Alinti
+                    # tanitmaya yarar, karar vermeye yetmez.
+                    "tam_bolum": p["metin"][:2500],
                     "vektor_benzerlik": float(benzerlik[i]),
                 }
-        return sorted(belgeler.values(), key=lambda x: -x["puan"])[:limit]
+        siralı = sorted(belgeler.values(), key=lambda x: -x["puan"])
+        # Esigi gecen yoksa BOS donuyoruz; arayuz "bulunamadi" diyor.
+        # Zorla bir sey gostermek, avukatin listeye guvenini bitirir.
+        elenmis = [b for b in siralı
+                   if b["vektor_benzerlik"] >= EN_AZ_BENZERLIK]
+        return elenmis[:limit]
