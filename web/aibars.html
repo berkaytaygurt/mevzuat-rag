@@ -2143,6 +2143,14 @@ function yildizlariTazele() {
 }
 
 function ciz(d, sessiz) {
+  // Kayitli bir ARSIV aramasi geri cizilirken mevzuat akisina
+  // sokulmamali: madde yok, dogrulama yok, sekme yok.
+  if (d && d.arsiv) {
+    sonVeri = d;
+    konusmalar.push(d);
+    arsivCiz(d);
+    return;
+  }
   // Ipucu bir ara sonuc gelince gizleniyordu (ust serit ince kalsin
   // diye). Serit artik sabit degil, yukarida kaliyor; gizlemek
   // yalnizca "yazi kayboldu" hissi veriyordu. Duruyor.
@@ -2803,7 +2811,14 @@ async function arsivAra() {
       const h = await r.json().catch(function () { return {}; });
       throw new Error(h.detail || ("sunucu " + r.status));
     }
-    arsivCiz(await r.json());
+    const d = await r.json();
+    // Arsiv aramasi da bir CALISMA: sohbete kaydediliyor, yoksa sol
+    // taraf bos kaliyor ve avukat ne aradigini geri bulamiyor.
+    if (d.sonuclar && d.sonuclar.length) {
+      soruKaydet(d.soru);
+      arsivKaydet(d);
+    }
+    arsivCiz(d);
     soruEl.value = "";
     boyutlandir();
   } catch (hata) {
@@ -2812,6 +2827,27 @@ async function arsivAra() {
   } finally {
     gonderEl.disabled = false;
   }
+}
+
+/* Arsiv sonucunu acik dosyaya yazar. Mevzuat cevaplariyla ayni
+   listede duruyor; "arsiv" bayragi hangisi oldugunu soyluyor. */
+function arsivKaydet(d) {
+  let dosya = acikDosya();
+  if (!dosya) dosya = dosyaYeni(dosyaAdiUret(d.soru));
+  dosya.cevaplar = dosya.cevaplar || [];
+  dosya.cevaplar = dosya.cevaplar.filter(function (x) { return x.soru !== d.soru; });
+  dosya.cevaplar.unshift({
+    soru: d.soru, arsiv: true, kayitli: true, zaman: Date.now(),
+    // Tam bolum SAKLANMIYOR: belge basina 2.5 KB, on sonucta 25 KB
+    // ve tarayici deposu dolar. Geri cizerken alinti yetiyor.
+    sonuclar: (d.sonuclar || []).map(function (s) {
+      return { belge: s.belge, bolum: s.bolum, alinti: s.alinti,
+               acilabilir: s.acilabilir };
+    }),
+    maddeler: [], kararlar: [],
+  });
+  if (dosya.cevaplar.length > EN_FAZLA_KAYIT) dosya.cevaplar.length = EN_FAZLA_KAYIT;
+  dosyaKaydet();
 }
 
 function arsivCiz(d) {
@@ -2828,10 +2864,12 @@ function arsivCiz(d) {
   h += '<div class="arsiv-ipucu">Eşleşen paragraf altta; ' +
        "tanıdığınız dosyayı açın.</div>";
   d.sonuclar.forEach(function (s, i) {
+    // Saklanmamis belge icin ACIKLAMA YAZILMIYOR: kullanicinin
+    // yapabilecegi bir sey yok, yalnizca kafa karistiriyordu.
     const acilabilir = s.acilabilir
       ? '<button class="belge-ac-dugme" data-belge="' + kacis(s.belge) +
         '">Belgeyi aç</button>'
-      : '<span class="bulunan-ipucu">belge saklanmamış</span>';
+      : "";
     h += '<div class="bulunan n' + ((i % 6) + 1) +
          '" data-bulunan="' + i + '">' +
       '<div class="bulunan-bas">' +
@@ -2844,9 +2882,7 @@ function arsivCiz(d) {
         '<div class="bulunan-tam-metin">' +
           alintiVurgula(s.tam_bolum || s.alinti || "", d.soru) +
         "</div>" +
-        '<div class="bulunan-alt">' + acilabilir +
-          '<span class="bulunan-ipucu">kapatmak için post-it&rsquo;e tıklayın</span>' +
-        "</div>" +
+        (acilabilir ? '<div class="bulunan-alt">' + acilabilir + "</div>" : "") +
       "</div></div>";
   });
   const blok = konusmaEkle(h);

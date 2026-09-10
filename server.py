@@ -836,7 +836,11 @@ def arsiv_belge(ad: str):
         raise HTTPException(404, "Belge saklanmamis.")
     tur = ("application/pdf" if yol.suffix.lower() == ".pdf"
            else "text/plain; charset=utf-8")
-    return FileResponse(yol, media_type=tur, filename=yol.name)
+    # filename VERILMIYOR: FileResponse ad verilince
+    # "Content-Disposition: attachment" koyuyor ve tarayici dosyayi
+    # ACMAK yerine INDIRIYOR. Avukat belgeyi gormek istiyor.
+    return FileResponse(yol, media_type=tur, headers={
+        "Content-Disposition": 'inline; filename="%s"' % _guvenli_ad(ad)})
 
 
 @app.get("/api/arsiv/ilerleme")
