@@ -390,6 +390,52 @@
   }
   .mod-not { font-size: 11.5px; color: var(--metin-sol); margin-left: 4px; }
 
+  /* ---------- atif denetimi ---------- */
+  .denetim-ozet {
+    display: flex; flex-wrap: wrap; gap: 8px;
+    max-width: 980px; margin: 0 auto 14px;
+  }
+  .denetim-rozet {
+    font-family: var(--daktilo); font-size: 11.5px; font-weight: 600;
+    padding: 4px 9px; border-radius: 2px; border: 1px solid;
+  }
+  .r-tamam  { background: #e2efe9; color: #1d6b52; border-color: #b6d8ca; }
+  .r-uyari  { background: var(--uyari-bg); color: var(--uyari); border-color: #ddc79b; }
+  .r-hata   { background: #f6e4de; color: #9a3a1e; border-color: #e0bcae; }
+  .r-notr   { background: var(--yuzey-alt); color: var(--metin-orta);
+              border-color: var(--kenar); }
+
+  .atif {
+    max-width: 980px; margin: 0 auto 10px; padding: 12px 15px;
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-left: 3px solid var(--kenar); border-radius: 2px;
+  }
+  .atif.tamam { border-left-color: #1d6b52; }
+  .atif.mulga, .atif.bulunamadi { border-left-color: #9a3a1e; }
+  .atif.kismi_mulga, .atif.kanun_yok { border-left-color: var(--uyari); }
+  .atif-bas {
+    display: flex; align-items: baseline; gap: 10px;
+    flex-wrap: wrap; margin-bottom: 5px;
+  }
+  .atif-ad {
+    font-family: var(--daktilo); font-size: 12.5px; font-weight: 700;
+    color: var(--metin);
+  }
+  .atif-baslik { font-size: 13px; color: var(--metin-orta); flex: 1; }
+  .atif-not { font-size: 12.5px; color: var(--uyari); font-weight: 600; }
+  .atif.mulga .atif-not, .atif.bulunamadi .atif-not { color: #9a3a1e; }
+  .atif-metin {
+    font-size: 12.5px; line-height: 1.6; color: var(--metin-orta);
+    margin-top: 7px; padding-top: 7px;
+    border-top: 1px solid var(--kenar-ince);
+    max-height: 160px; overflow-y: auto;
+  }
+  .denetim-not {
+    max-width: 980px; margin: 14px auto 0; padding: 10px 13px;
+    font-size: 12px; line-height: 1.55; color: var(--metin-orta);
+    background: var(--yuzey-alt); border-left: 3px solid var(--kenar);
+  }
+
   /* ---------- arsiv paneli ---------- */
   .arsiv-ilerleme {
     max-width: 980px; margin: 8px auto 0; text-align: center;
@@ -2989,6 +3035,7 @@ function belgeCiz(d, dosyaAdi) {
         kacis(d.maskeli) + "</textarea>" +
       '<div class="onay-alt">' +
         '<button class="onay-gonder" id="onayGonder">Onayla ve analiz et</button>' +
+        '<button class="onay-indir" id="onayDenetle">Atıfları denetle</button>' +
         '<button class="onay-indir" id="onayIndir">Maskeli PDF indir</button>' +
         '<button class="onay-vazgec" id="onayVazgec">Vazgeç</button>' +
         '<span class="onay-ipucu">Gözden kaçan bir isim varsa metinde ' +
@@ -3007,6 +3054,90 @@ function belgeCiz(d, dosyaAdi) {
   blok.querySelector("#onayIndir").onclick = function () {
     maskeliIndir(blok, dosyaAdi);
   };
+  blok.querySelector("#onayDenetle").onclick = function () {
+    atifDenetle(blok);
+  };
+  blogaKaydir(blok);
+}
+
+/* ATIF DENETIMI. Metindeki her kanun atfini kulliyatla karsilastirir.
+   Bulut cagrisi yok; tamamen yerel karsilastirma. */
+async function atifDenetle(blok) {
+  const dugme = blok.querySelector("#onayDenetle");
+  const metin = blok.querySelector("#maskeliMetin").value;
+  const eski = dugme.textContent;
+  dugme.disabled = true;
+  dugme.textContent = "Denetleniyor…";
+  try {
+    const r = await fetch("api/denetle", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metin: metin }),
+    });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    denetimCiz(await r.json());
+  } catch (hata) {
+    konusmaEkle('<div class="hata">Denetlenemedi.<code>' +
+      kacis(hata.message) + "</code></div>", "gecici");
+  } finally {
+    dugme.disabled = false;
+    dugme.textContent = eski;
+  }
+}
+
+function denetimCiz(d) {
+  const o = d.ozet || {};
+  const durumAdi = {
+    tamam: "yürürlükte", mulga: "MÜLGA",
+    kismi_mulga: "kısmen mülga", bulunamadi: "BULUNAMADI",
+    kanun_yok: "kanun çözümlenemedi",
+  };
+  let h = '<div class="ozet-kagit"><div class="sorulan">' +
+    '<span class="sorulan-etiket">Denetim</span>' +
+    (o.toplam || 0) + " kanun atfı incelendi</div></div>";
+
+  h += '<div class="denetim-ozet">';
+  if (o.tamam) h += '<span class="denetim-rozet r-tamam">' + o.tamam + " yürürlükte</span>";
+  if (o.mulga) h += '<span class="denetim-rozet r-hata">' + o.mulga + " mülga</span>";
+  if (o.kismi_mulga) h += '<span class="denetim-rozet r-uyari">' + o.kismi_mulga + " kısmen mülga</span>";
+  if (o.bulunamadi) h += '<span class="denetim-rozet r-hata">' + o.bulunamadi + " bulunamadı</span>";
+  if (o.kanun_yok) h += '<span class="denetim-rozet r-uyari">' + o.kanun_yok + " belirsiz</span>";
+  if (!o.toplam) h += '<span class="denetim-rozet r-notr">kanun atfı bulunamadı</span>';
+  if ((d.kararlar || []).length) {
+    h += '<span class="denetim-rozet r-notr">' + d.kararlar.length +
+         " karar atfı · denetlenmedi</span>";
+  }
+  h += "</div>";
+
+  (d.atiflar || []).forEach(function (a) {
+    h += '<div class="atif ' + kacis(a.durum) + '">' +
+      '<div class="atif-bas">' +
+        '<span class="atif-ad">' + kacis(a.kanun_no || a.kaynak) +
+          " m." + kacis(a.madde_no) + "</span>" +
+        '<span class="atif-baslik">' + kacis(a.baslik || a.kanun_adi || "") + "</span>" +
+        '<span class="atif-not">' + kacis(a.not_ || durumAdi[a.durum] || "") + "</span>" +
+      "</div>" +
+      (a.metin ? '<div class="atif-metin">' + kacis(a.metin) + "</div>" : "") +
+      "</div>";
+  });
+
+  if ((d.kararlar || []).length) {
+    h += '<div class="denetim-not"><b>Mahkeme kararları denetlenmedi.</b> ' +
+      "Kararlar külliyatta değil, canlı aramadan geliyor. Uydurma karar " +
+      "numarası yapay zekânın en sık hatası; bunları ayrıca doğrulayın: " +
+      d.kararlar.map(function (k) {
+        return kacis(k.esas + (k.karar ? " E. " + k.karar + " K." : " E."));
+      }).join(" · ") + "</div>";
+  }
+  h += '<div class="denetim-not">Bu denetim maddenin <b>var olup ' +
+    "olmadığını ve yürürlükte kalıp kalmadığını</b> söyler. Maddenin " +
+    "iddianızı destekleyip desteklemediği hukuki bir değerlendirmedir; " +
+    "gerçek metin yukarıda, kararı siz verirsiniz.</div>";
+
+  const blok = konusmaEkle(h);
   blogaKaydir(blok);
 }
 

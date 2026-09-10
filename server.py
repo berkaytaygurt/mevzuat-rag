@@ -866,6 +866,37 @@ def arsiv_ara(istek: ArsivSorgu):
     return {"soru": soru, "sonuclar": sonuclar}
 
 
+# ---------------------------------------------------------------- denetim
+# ATIF DENETIMI. Dil modelinin yapisal olarak yapamadigi is: kulliyat
+# onun elinde yok, uydurdugu atfi dogrulayamiyor. Bizde kulliyat var.
+# Bu uc de BULUTA CIKMIYOR -- denetim tamamen yerel karsilastirma.
+_DENETCI = {}
+
+
+def _denetci():
+    from core.denetim import Denetci
+
+    if "d" not in _DENETCI:
+        k = kaynaklar()
+        _DENETCI["d"] = Denetci(k["store"].tum_kayitlar())
+    return _DENETCI["d"]
+
+
+class DenetimIstegi(BaseModel):
+    metin: str
+
+
+@app.post("/api/denetle")
+def denetle(istek: DenetimIstegi):
+    """Metindeki kanun atiflarini kulliyata karsi denetler."""
+    metin = (istek.metin or "").strip()
+    if not metin:
+        raise HTTPException(422, "Bos metin denetlenemez.")
+    if len(metin) > 400_000:
+        raise HTTPException(413, "Metin cok uzun.")
+    return _denetci().denetle(metin)
+
+
 class MaskeliPdf(BaseModel):
     metin: str
     ad: str = "maskeli-belge"
