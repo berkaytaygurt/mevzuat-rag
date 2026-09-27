@@ -62,9 +62,9 @@ Kurallar:
    haciz, tespit davası, ihtarname), yalnızca usul kurumunu yazma.
    Talebin ARKASINDAKİ esas uyuşmazlığı da yaz. Bir şeyin tespiti
    isteniyorsa, o şey hangi hukuki uyuşmazlığın konusuysa onu da çıkar.
-   YANLIŞ: yalnızca "delil tespiti istenmesinin şartları"
-   DOĞRU : "delil tespiti istenmesinin şartları" + "satılan malın
-           ayıplı olması ve alıcının seçimlik hakları""""
+   YANLIŞ: yalnızca 'delil tespiti istenmesinin şartları'
+   DOĞRU : 'delil tespiti istenmesinin şartları' + 'satılan malın
+           ayıplı olması ve alıcının seçimlik hakları'"""
 
 ISTEM = """Olay: {soru}
 
