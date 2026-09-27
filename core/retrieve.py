@@ -445,11 +445,24 @@ class Retriever:
 
         Ayrilamiyorsa None doner; cagiran taraf normal akisa devam eder.
         """
-        from .mesele import cok_olgulu_mu, meseleleri_ayir
+        from .generate import ModelYuklenemedi
+        from .mesele import SaglayiciTukendi, cok_olgulu_mu, meseleleri_ayir
 
         if not cok_olgulu_mu(soru):
             return None
-        meseleler = meseleleri_ayir(soru, self.genisletici.uretici)
+        # BURADA YEDEK VAR, BELGE ANALIZINDE YOK -- ayrim kasitli.
+        # meseleleri_ayir() kota/kurulum hatasini artik yukseltiyor;
+        # dogrusu bu, cunku belge analizinde baska yol yok. Ama normal
+        # aramada mesele ayirma yalnizca bir IYILESTIRME: ayrilamazsa
+        # soru oldugu gibi aranir ve sonuc yine gelir. Olculdu: bu
+        # istisna yukselince 14 olayin tamami coktu, oysa 'ayirma yok'
+        # kosulu tek basina 13/39 gold getiriyordu.
+        try:
+            meseleler = meseleleri_ayir(soru, self.genisletici.uretici)
+        except (SaglayiciTukendi, ModelYuklenemedi) as exc:
+            log.warning("mesele ayirma devre disi (%s); soru bolunmeden "
+                        "aranacak", type(exc).__name__)
+            return None
         if not meseleler:
             return None
 

@@ -269,6 +269,18 @@ def sayilari_dogrula(cevap: str, baglam: str) -> list[str]:
     return sorted(set(suphe), key=int)
 
 
+class ModelYuklenemedi(RuntimeError):
+    """Yerel model DOSYASI yuklenemedi: kurulum sorunu, istek sorunu degil.
+
+    Ayri bir tur olmasinin sebebi olculdu: llama_cpp 0.3.4 "qwen3"
+    mimarisini tanimiyordu ve model hic yuklenmiyordu. Hata sade bir
+    RuntimeError oldugu icin meseleleri_ayir() onu istek basina bir
+    aksilik sanip yutuyordu; olcum 14 olayin 14'unde "mesele
+    cikaramadi" yazdi ve bu bir sure MODELIN BECERIKSIZLIGI sanildi.
+    Kurulum hatasi ile kalite sorunu birbirine karismamali.
+    """
+
+
 class Generator:
     def __init__(self, provider: str | None = None):
         # PROVIDER ARTIK BUTUN CAGRILARI YONLENDIRIYOR. Once yalnizca
@@ -426,7 +438,7 @@ class Generator:
             if not yol.is_absolute():
                 yol = config.ROOT / yol
             if not yol.exists():
-                raise RuntimeError(
+                raise ModelYuklenemedi(
                     f"Yerel model bulunamadi: {yol}\n"
                     "README'deki model indirme adimini calistirin veya "
                     ".env icinde PROVIDER=gemini yapin.")
@@ -452,7 +464,7 @@ class Generator:
                     log.warning("GPU katmani %s ile yuklenemedi: %s", katman,
                                 str(exc)[:120])
             if self._client is None:
-                raise RuntimeError(f"Yerel model yuklenemedi: {son_hata}")
+                raise ModelYuklenemedi(f"Yerel model yuklenemedi: {son_hata}")
         resp = self._client.create_chat_completion(
             messages=[{"role": "system", "content": sistem or SISTEM},
                       {"role": "user", "content": istem}],

@@ -74,6 +74,7 @@ from __future__ import annotations
 import logging
 
 import config
+from .generate import ModelYuklenemedi
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +100,18 @@ def varsayimsal_hukum(soru: str, uretici) -> str:
     """Soruyu cevaplayan varsayimsal hukum metni; uretilemezse bos doner."""
     try:
         c = uretici.kisa(ISTEM.format(soru=soru), sistem=SISTEM,
-                            model=config.GEMINI_HIZLI_MODEL)
+                            model=config.GEMINI_HIZLI_MODEL,
+                            max_token=100)
+    # TOKEN SINIRI OLCULDU. Yerel modelde varsayilan 512 ile 65.3 sn,
+    # 120 ile 26.3 sn suruyor ve CIKTI AYNI -- model kullanilmayan
+    # fazlalik uretiyordu (tek cumle, en fazla 25 kelime isteniyor).
+    except ModelYuklenemedi:
+        # KURULUM HATASI YUTULMAZ. Model dosyasi hic yuklenmiyorsa bu
+        # her istekte tekrarlanacak kalici bir sorun; sessizce bos
+        # donmek onu modelin beceriksizligi gibi gosteriyor. Olculdu:
+        # llama_cpp 0.3.4 qwen3 mimarisini tanimiyordu, olcum 14/14
+        # 'mesele cikaramadi' yazdi ve sebep bir sure yanlis arandi.
+        raise
     except Exception as exc:
         log.warning("HyDE uretilemedi: %s", str(exc)[:80])
         return ""

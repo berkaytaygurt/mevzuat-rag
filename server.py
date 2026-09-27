@@ -413,7 +413,12 @@ class Soru(BaseModel):
     # zaten 25 adayi puanliyor; 15'e cikarmak bir sey kazandirmiyor.
     k: int = 10
     mulga_haric: bool = True
-    cevap_uret: bool = True
+    # VARSAYILAN KAPALI. Olculdu: yerel modelle bir soru 512 saniye
+    # suruyordu ve bunun buyuk kismi cevabi paragrafa dokmekti. Isin
+    # degeri bulunan maddelerde; cevap metni konfor. Ustelik yerel
+    # model atif uyduruyor -- '60 gunluk sure' deyip TBK m.362'ye
+    # baglamisti, oysa o madde baska sey. Isteyen Ayarlar'dan acar.
+    cevap_uret: bool = False
     karsi_taraf: bool = True
     vurgu: bool | None = None
 

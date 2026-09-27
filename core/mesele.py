@@ -26,6 +26,7 @@ import logging
 import re
 
 import config
+from .generate import ModelYuklenemedi
 
 log = logging.getLogger(__name__)
 
@@ -99,7 +100,18 @@ def meseleleri_ayir(soru: str, uretici, en_az: int = 2) -> list[str]:
     """
     try:
         c = uretici.kisa(ISTEM.format(soru=soru), sistem=SISTEM,
-                            model=config.GEMINI_HIZLI_MODEL)
+                            model=config.GEMINI_HIZLI_MODEL,
+                            max_token=200)
+    # TOKEN SINIRI OLCULDU. Yerel modelde varsayilan 512 ile 65.3 sn,
+    # 120 ile 26.3 sn suruyor ve CIKTI AYNI -- model kullanilmayan
+    # fazlalik uretiyordu (en fazla 4 satir x ~140 karakter aliniyor).
+    except ModelYuklenemedi:
+        # KURULUM HATASI YUTULMAZ. Model dosyasi hic yuklenmiyorsa bu
+        # her istekte tekrarlanacak kalici bir sorun; sessizce bos
+        # donmek onu modelin beceriksizligi gibi gosteriyor. Olculdu:
+        # llama_cpp 0.3.4 qwen3 mimarisini tanimiyordu, olcum 14/14
+        # 'mesele cikaramadi' yazdi ve sebep bir sure yanlis arandi.
+        raise
     except Exception as exc:
         # SAGLAYICI HATASI SESSIZ KALMAMALI. Onceden her hata bos liste
         # donuyordu; kredi bitince (402 RESOURCE_EXHAUSTED) belge analizi
