@@ -170,7 +170,7 @@ def arama_hedefi(soru: str, uretici) -> tuple[str, str]:
     Doner: (terim, "yargitay" | "danistay"). Terim uretilemezse ("", "").
     """
     try:
-        c = uretici._gemini(ISTEM.format(soru=soru), sistem=SISTEM,
+        c = uretici.kisa(ISTEM.format(soru=soru), sistem=SISTEM,
                             model=config.GEMINI_HIZLI_MODEL)
     except Exception as exc:
         log.warning("arama terimi uretilemedi: %s", str(exc)[:80])

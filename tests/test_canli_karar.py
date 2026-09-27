@@ -31,7 +31,7 @@ class _SahteUretici:
         self.patla = patla
         self.cagrilar = []
 
-    def _gemini(self, istem, sistem=None, model=None):
+    def kisa(self, istem, sistem=None, model=None, max_token=512):
         self.cagrilar.append(istem)
         if self.patla:
             raise RuntimeError("gemini yok")

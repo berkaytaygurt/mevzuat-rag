@@ -74,10 +74,9 @@ class SorguGenisletici:
             istem = ISTEM.format(soru=soru)
             # Kucuk is: hizli model yeter. Buyuk model bu istegi 36
             # saniyede donduruyordu, flash-lite 0.6 saniyede.
-            ek = (self.uretici._gemini(istem, sistem=SISTEM,
-                                       model=config.GEMINI_HIZLI_MODEL)
-                  if self.provider == "gemini"
-                  else self.uretici._local(istem, sistem=SISTEM, max_token=120))
+            ek = self.uretici.kisa(istem, sistem=SISTEM,
+                                   model=config.GEMINI_HIZLI_MODEL,
+                                   max_token=120)
         except Exception as exc:
             log.warning("sorgu genisletilemedi: %s", str(exc)[:80])
             return soru

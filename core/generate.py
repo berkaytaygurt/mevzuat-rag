@@ -271,6 +271,12 @@ def sayilari_dogrula(cevap: str, baglam: str) -> list[str]:
 
 class Generator:
     def __init__(self, provider: str | None = None):
+        # PROVIDER ARTIK BUTUN CAGRILARI YONLENDIRIYOR. Once yalnizca
+        # cevap yazmayi yonlendiriyordu; hyde/mesele/karsi_taraf/
+        # canli_karar dogrudan _gemini() cagirdigi icin PROVIDER=local
+        # diyen kullanicinin belgesi yine Google'a gidiyordu. Hepsi
+        # kisa() uzerinden geciyor -- yeni yardimci cagri eklerken
+        # _gemini() degil kisa() cagirin.
         self.provider = (provider or config.PROVIDER).lower()
         self._client = None
 
@@ -326,6 +332,24 @@ class Generator:
         return cevap
 
     # ---------- saglayicilar ----------
+    def kisa(self, istem: str, sistem: str | None = None,
+             model: str | None = None, max_token: int = 512) -> str:
+        """Kisa cikti isteyen yardimci cagrilar icin: SAGLAYICIYA UYAR.
+
+        HyDE, mesele cikarimi, karsi taraf ve karar sorgusu -- dordu de
+        birkac satirlik cikti uretir, akici paragraf yazmaz. Onceden bu
+        dordu dogrudan _gemini() cagiriyordu, yani PROVIDER=local diyen
+        kullanicinin BELGESI yine Google'a gidiyordu. Tek koruma
+        GEMINI_API_KEY tanimli olmamasiydi; anahtar varsa sessizce
+        disari cikiyordu.
+
+        model parametresi yalnizca Gemini icin anlamli; yerel tarafta
+        yutuluyor ki cagiranlar iki ayri imza tasimak zorunda kalmasin.
+        """
+        if self.provider == "gemini":
+            return self._gemini(istem, sistem=sistem, model=model)
+        return self._local(istem, sistem=sistem, max_token=max_token)
+
     def _gemini(self, istem: str, sistem: str | None = None,
                 model: str | None = None) -> str:
         """Gemini'ye istem gonderir.

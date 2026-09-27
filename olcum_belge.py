@@ -48,21 +48,9 @@ from tests.olcum_belge_seti import OLAYLAR
 logging.basicConfig(level=logging.ERROR)
 
 
-class YerelUretici:
-    """meseleleri_ayir() uretici._gemini() cagiriyor; yerele yonlendirir.
-
-    Kodda su an saglayici GLOBAL: ya hepsi Gemini ya hepsi yerel. Cagri
-    basina secim ozelligini olcumden ONCE yazmiyoruz -- olcum "gerekli
-    mi" sorusunu cevaplayacak. Bu kabuk o yuzden gecici.
-    """
-
-    def __init__(self) -> None:
-        self._g = Generator(provider="local")
-
-    def _gemini(self, istem: str, sistem: str | None = None,
-                model: str | None = None) -> str:
-        return self._g._local(istem, sistem=sistem)
-
+# YerelUretici kabugu kaldirildi: saglayici secimi artik Generator.kisa()
+# icinde, meseleleri_ayir() dogrudan Generator(provider="local") ile
+# calisiyor. Kabuk _gemini() metodunu taklit ediyordu, o yol kapandi.
 
 def birlesik_ara(retriever, meseleler: list[str], limit: int) -> dict:
     """Her meseleyi ayri arar, en iyi sirayi koruyarak birlestirir."""
@@ -90,13 +78,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=10)
     ap.add_argument("--yereli-atla", action="store_true")
+    # Kredi bitikken Gemini kosulu her olay icin bosa API cagirip 402
+    # aliyor. Yerel modeli tek basina olcerken bu anahtar kullanilir;
+    # karsilastirma zemini olarak rapordaki "ayirma yok" satiri alinir.
+    ap.add_argument("--geminiyi-atla", action="store_true")
     ap.add_argument("--cikti", default=None)
     args = ap.parse_args()
 
     store = VektorDeposu()
     retriever = Retriever(store, Embedder())
-    gemini = Generator(provider="gemini")
-    yerel = None if args.yereli_atla else YerelUretici()
+    gemini = None if args.geminiyi_atla else Generator(provider="gemini")
+    yerel = None if args.yereli_atla else Generator(provider="local")
 
     from core.mesele import meseleleri_ayir
 
@@ -104,6 +96,11 @@ def main() -> None:
     out.write("MESELE CIKARIMI: GEMINI vs YEREL MODEL\n")
     out.write(f"model: {config.LOCAL_MODEL_PATH} | GPU katmani: "
               f"{config.LOCAL_GPU_LAYERS} | limit: {args.limit}\n")
+    # Kosullar rapora yazilmazsa iki kosu yanlislikla karsilastirilir:
+    # yeniden siralama kapaliyken alinan sayi acikken alinanla ayni degil.
+    out.write(f"gomucu: {config.EMBED_DEVICE} | yeniden siralama: "
+              f"{'acik' if config.RERANK else 'KAPALI'} | "
+              f"HyDE: {'acik' if config.HYDE else 'KAPALI'}" + chr(10))
 
     toplam_gold = sum(len(g) for _, g in OLAYLAR)
     sayac = {ad: {"vurus": 0, "mrr": 0.0, "gosterilen": 0, "sure": 0.0,

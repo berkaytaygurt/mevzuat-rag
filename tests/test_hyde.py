@@ -13,7 +13,7 @@ class SahteUretici:
         self.cevap = cevap
         self.cagri = 0
 
-    def _gemini(self, istem, sistem=None, model=None):
+    def kisa(self, istem, sistem=None, model=None, max_token=512):
         self.cagri += 1
         return self.cevap
 
@@ -51,7 +51,7 @@ def test_uzun_metin_kirpiliyor():
 
 def test_uretim_hatasi_aramayi_engellemiyor():
     class Patlayan:
-        def _gemini(self, *a, **k):
+        def kisa(self, *a, **k):
             raise RuntimeError("kota doldu")
 
     assert varsayimsal_hukum("soru", Patlayan()) == ""

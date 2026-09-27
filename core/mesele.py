@@ -98,7 +98,7 @@ def meseleleri_ayir(soru: str, uretici, en_az: int = 2) -> list[str]:
     alti bagajinin taranmasi" gibi maddeler getiriyordu.
     """
     try:
-        c = uretici._gemini(ISTEM.format(soru=soru), sistem=SISTEM,
+        c = uretici.kisa(ISTEM.format(soru=soru), sistem=SISTEM,
                             model=config.GEMINI_HIZLI_MODEL)
     except Exception as exc:
         # SAGLAYICI HATASI SESSIZ KALMAMALI. Onceden her hata bos liste

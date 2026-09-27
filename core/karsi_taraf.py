@@ -50,7 +50,7 @@ def karsi_sorgu(soru: str, uretici) -> str:
     Bos string doner: soru uyusmazlik icermiyorsa ya da uretim basarisizsa.
     """
     try:
-        c = uretici._gemini(ISTEM.format(soru=soru), sistem=SISTEM,
+        c = uretici.kisa(ISTEM.format(soru=soru), sistem=SISTEM,
                             model=config.GEMINI_HIZLI_MODEL)
     except Exception as exc:
         log.warning("karsi sorgu uretilemedi: %s", str(exc)[:80])

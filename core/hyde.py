@@ -98,7 +98,7 @@ EN_FAZLA_KARAKTER = 300
 def varsayimsal_hukum(soru: str, uretici) -> str:
     """Soruyu cevaplayan varsayimsal hukum metni; uretilemezse bos doner."""
     try:
-        c = uretici._gemini(ISTEM.format(soru=soru), sistem=SISTEM,
+        c = uretici.kisa(ISTEM.format(soru=soru), sistem=SISTEM,
                             model=config.GEMINI_HIZLI_MODEL)
     except Exception as exc:
         log.warning("HyDE uretilemedi: %s", str(exc)[:80])
