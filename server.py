@@ -505,6 +505,27 @@ async def belge_yukle(dosya: UploadFile = File(...)):
     }
 
 
+def _belge_ozu(metin: str) -> str:
+    """Tek meseleli belgeden arama sorgusu cikarir.
+
+    Belgenin tamamini sorgu yapmak ise yaramiyor: vektor butun konularin
+    bulanik ortalamasi oluyor. Dilekcenin KONU bolumu zaten avukatin
+    "bu belge ne hakkinda" diye yazdigi cumle; varsa o kullaniliyor.
+    """
+    for satir in (metin or "").splitlines():
+        s = satir.strip()
+        if re.match(r"^KONU\s*[:：]", s, re.IGNORECASE):
+            oz = re.sub(r"^KONU\s*[:：]\s*", "", s, flags=re.IGNORECASE)
+            if len(oz) >= 20:
+                return oz[:400]
+    # KONU yoksa: ilk yeterince uzun paragraf
+    for satir in (metin or "").splitlines():
+        s = satir.strip()
+        if len(s) >= 60 and not s.isupper():
+            return s[:400]
+    return (metin or "")[:400]
+
+
 class BelgeAnaliz(BaseModel):
     oturum: str
     maskeli: str                      # kullanicinin duzenledigi hali
@@ -528,9 +549,29 @@ def belge_analiz(istek: BelgeAnaliz):
     k = kaynaklar()
     from core.mesele import meseleleri_ayir
 
-    meseleler = meseleleri_ayir(metin, k["generator"]) or []
+    # meseleleri_ayir TEK mesele ciktiginda bilerek BOS donuyor:
+    # mevzuat aramasinda cagiran taraf normal aramaya devam ediyor,
+    # yani orada dogru davranis. Belge analizinde ise yedek yoktu ve
+    # TEK MESELELI HER BELGE hata veriyordu -- ornek: HMK m.400 delil
+    # tespiti talebi. Artik belgenin kendisi tek mesele sayiliyor.
+    from core.mesele import SaglayiciTukendi
+    try:
+        meseleler = meseleleri_ayir(metin, k["generator"]) or []
+    except SaglayiciTukendi as exc:
+        # 503: gecici ve bizim tarafimizda. Kullaniciya "belge bozuk"
+        # gibi degil, ne oldugu soylenerek doner.
+        raise HTTPException(503, str(exc))
+    tek_mesele = False
     if not meseleler:
-        raise HTTPException(422, "Belgeden ayri hukuki mesele cikarilamadi.")
+        # Modelin yazdigi TEK meseleyi kabul et. Ilk surumde belgenin ham
+        # KONU cumlesi sorgu yapiliyordu ve saçma sonuc veriyordu: usul
+        # dilinde yazilmis bir tespit talebi ("HMK m.400 uyarinca kesif")
+        # icindeki "bagaj/arac" kelimeleriyle tasimacilik yonetmeliklerine
+        # carpiyordu. Modelin cumlesi hukuki kavram tasiyor.
+        meseleler = meseleleri_ayir(metin, k["generator"], en_az=1) or []
+        tek_mesele = True
+    if not meseleler:
+        meseleler = [_belge_ozu(metin)]
 
     bolumler = []
     for mesele in meseleler:
@@ -547,7 +588,7 @@ def belge_analiz(istek: BelgeAnaliz):
             } for m in maddeler],
         })
     return {"bolumler": bolumler, "mesele_sayisi": len(meseleler),
-            "ozet": maske.ozet()}
+            "tek_mesele": tek_mesele, "ozet": maske.ozet()}
 
 
 # ---------------------------------------------------------------- arsiv
@@ -880,6 +921,26 @@ def _denetci():
         k = kaynaklar()
         _DENETCI["d"] = Denetci(k["store"].tum_kayitlar())
     return _DENETCI["d"]
+
+
+class SizintiIstegi(BaseModel):
+    metin: str
+
+
+@app.post("/api/sizinti")
+def sizinti_tara(istek: SizintiIstegi):
+    """Maskeli metinde kalan tanitici izleri isaretler.
+
+    MASKELEMIYOR, yalnizca ISARETLIYOR: bu izlerin kalipli bir bicimi
+    yok ve otomatik gizlemek metni delik desik ederdi. Karar avukatin.
+    Tamamen yerel; bulut cagrisi yok.
+    """
+    from core.sizinti import tara
+
+    metin = (istek.metin or "").strip()
+    if not metin:
+        raise HTTPException(422, "Bos metin taranamaz.")
+    return tara(metin)
 
 
 class DenetimIstegi(BaseModel):

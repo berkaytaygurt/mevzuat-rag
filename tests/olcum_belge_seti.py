@@ -93,4 +93,21 @@ OLAYLAR: list[Kayit] = [
      "Dava açmadan önce taşınmazları üzerine ihtiyati tedbir konulmasını "
      "ve dava dilekçemizin kabulünü talep ediyoruz.",
      [("6100", "389"), ("6100", "119")]),
+
+    # USUL TALEBI + ESAS UYUSMAZLIK. Gercek bir dosyada goruldu: delil
+    # tespiti dilekcesi yuklendiginde sistem yalnizca usul maddelerini
+    # ariyor, dosyanin esasini (arac ayibi) kaciriyordu. Bu iki kayit
+    # SISTEM istemindeki 7. kurali olcuyor: usul kurumu YANINDA arkasindaki
+    # esas uyusmazlik da cikarilmali. Gold'da ikisi birden var; yalnizca
+    # 6100 m.400 getiren bir cikarim burada dusuk puan alir.
+    ("Müvekkilim yetkili bayiden sıfır kilometre satın aldığı araçta "
+     "teslimden kısa süre sonra motor arızası çıkmıştır. Dava açmadan "
+     "önce aracın mevcut durumunun bilirkişi eliyle tespitini talep "
+     "ediyoruz.",
+     [("6100", "400"), ("6502", "8"), ("6502", "11")]),
+
+    ("Müvekkil şirketin satın aldığı üretim makinesi teslimden kısa süre "
+     "sonra kusurlu çalışmaya başlamıştır. Delillerin kaybolmaması için "
+     "makinedeki ayıbın tespitini istiyoruz.",
+     [("6100", "400"), ("6098", "227"), ("6098", "231")]),
 ]

@@ -236,7 +236,7 @@ def pdfe_dok(metin: str, baslik: str = "Maskelenmiş belge") -> bytes:
     sayfa, yazici, y = yeni_sayfa()
     genislik = sayfa.rect.width - 2 * kenar
 
-    for ham in metin.splitlines():
+    for ham in _paragraflara_ayir(metin):
         # Uzun satirlar sayfa disina tasmasin diye sariliyor.
         parcalar = _sar(ham, yazitipi, yazi_boyu, genislik) or [""]
         for parca in parcalar:
@@ -259,6 +259,43 @@ def pdfe_dok(metin: str, baslik: str = "Maskelenmiş belge") -> bytes:
     veri = belge.tobytes(garbage=3, deflate=True)
     belge.close()
     return veri
+
+
+# Cumle sonu: nokta, soru, unlem, iki nokta -- ve kapanis tirnaklari.
+_CUMLE_SONU = re.compile(r"[.!?:;]['\"”’)\]]*\s*$")
+# Yeni paragraf basi: numarali madde, madde imi, ya da BUYUK HARFLI baslik
+_PARAGRAF_BASI = re.compile(
+    r"^\s*(?:\d+[.)]\s|[-*•]\s|[A-ZÇĞİÖŞÜ][A-ZÇĞİÖŞÜ\s]{3,}[:]?\s*$)")
+
+
+def _paragraflara_ayir(metin: str) -> list[str]:
+    """Kaynak PDF'in satir sonlarini atip paragraflari yeniden akitir.
+
+    NEDEN: PDF'ten cikan metinde satirlar sayfa genisligine gore
+    kirilmis geliyor. Bunlari oldugu gibi yeniden yazdirinca satirlar
+    rastgele yerlerden bitiyor ve belge dagilmis gorunuyor.
+
+    TEMKINLI BIRLESTIRME: yalnizca onceki satir cumle sonu noktalamasi
+    TASIMIYORSA ve yeni satir bir paragraf basi DEGILSE birlestiriyoruz.
+    Numarali maddeler ve buyuk harfli basliklar kendi satirinda kaliyor
+    -- dilekce duzeni onlarla okunuyor.
+    """
+    cikti: list[str] = []
+    for ham in (metin or "").splitlines():
+        satir = ham.rstrip()
+        if not satir.strip():
+            cikti.append("")
+            continue
+        birlestir = (
+            cikti and cikti[-1].strip()
+            and not _CUMLE_SONU.search(cikti[-1])
+            and not _PARAGRAF_BASI.match(satir)
+        )
+        if birlestir:
+            cikti[-1] = cikti[-1].rstrip() + " " + satir.lstrip()
+        else:
+            cikti.append(satir)
+    return cikti
 
 
 def _sar(satir: str, yazitipi, boy: float, genislik: float) -> list[str]:

@@ -29,6 +29,16 @@ import config
 
 log = logging.getLogger(__name__)
 
+
+class SaglayiciTukendi(RuntimeError):
+    """Bulut saglayicinin kotasi/kredisi bitti -- gecici ve faturalik."""
+
+# OLCULMEDI. 7. kural gercek bir dosyada goruldugu icin eklendi: delil
+# tespiti talebi yuklenince sistem yalnizca usul maddelerini ariyordu,
+# oysa dosyanin esasi arac ayibiydi (6502 m.11/15). Kural Gemini kredisi
+# bitikken yazildi, olculemedi. Kredi gelince
+# `python olcum_belge.py` ile ayrica olcun -- olcum setinde usul basligi
+# altinda iki kayit var.
 # ONEMLI: her mesele KENDI BASINA aranacagi icin baglami tasimali.
 # Olculdu -- "Savunma alma zorunlulugu" diye ayri aratildiginda sistem
 # Sivil Savunma Kanunu'nu ve Turk Silahli Kuvvetleri yonetmeligini
@@ -47,7 +57,14 @@ Kurallar:
    YANLIŞ: "işçinin savunmasının alınması zorunluluğu iş hukuku"
    DOĞRU : "iş sözleşmesinin feshinde işçinin savunmasının alınması"
 5. Olayın kendi ayrıntılarını (süre, isim, tarih) yazma; hukuki kavramı yaz.
-6. Tek bir mesele varsa tek satır yaz."""
+6. Tek bir mesele varsa tek satır yaz.
+7. Belge bir USUL talebiyse (delil tespiti, ihtiyati tedbir, ihtiyati
+   haciz, tespit davası, ihtarname), yalnızca usul kurumunu yazma.
+   Talebin ARKASINDAKİ esas uyuşmazlığı da yaz. Bir şeyin tespiti
+   isteniyorsa, o şey hangi hukuki uyuşmazlığın konusuysa onu da çıkar.
+   YANLIŞ: yalnızca "delil tespiti istenmesinin şartları"
+   DOĞRU : "delil tespiti istenmesinin şartları" + "satılan malın
+           ayıplı olması ve alıcının seçimlik hakları""""
 
 ISTEM = """Olay: {soru}
 
@@ -67,13 +84,37 @@ def cok_olgulu_mu(soru: str) -> bool:
     return len(COK_OLGU_RE.findall(soru)) >= 2
 
 
-def meseleleri_ayir(soru: str, uretici) -> list[str]:
-    """Soruyu hukuki meselelere ayirir; ayrilamiyorsa bos liste doner."""
+def meseleleri_ayir(soru: str, uretici, en_az: int = 2) -> list[str]:
+    """Soruyu hukuki meselelere ayirir.
+
+    en_az=2 (varsayilan): tek mesele ciktiginda BOS doner. Mevzuat
+    aramasinda dogru davranis, cunku cagiran taraf normal aramaya
+    devam ediyor ve tek meseleyi ayrica aramanin faydasi yok.
+
+    en_az=1: tek mesele de kullanilsin. BELGE ANALIZINDE sart --
+    orada yedek yok. Ustelik modelin yazdigi tek satir, belgenin ham
+    KONU cumlesinden cok daha iyi bir arama sorgusu: usul dili yerine
+    hukuki kavram tasiyor. Olculdu: ham KONU cumlesiyle arama "ucak
+    alti bagajinin taranmasi" gibi maddeler getiriyordu.
+    """
     try:
         c = uretici._gemini(ISTEM.format(soru=soru), sistem=SISTEM,
                             model=config.GEMINI_HIZLI_MODEL)
     except Exception as exc:
-        log.warning("mesele ayrilamadi: %s", str(exc)[:80])
+        # SAGLAYICI HATASI SESSIZ KALMAMALI. Onceden her hata bos liste
+        # donuyordu; kredi bitince (402 RESOURCE_EXHAUSTED) belge analizi
+        # ham KONU cumlesine dusup "ucak alti bagajinin taranmasi" gibi
+        # sonuclar veriyordu. Kullanici sistemin bozuk oldugunu saniyor,
+        # oysa yalnizca fatura sorunu var.
+        mesaj = str(exc)
+        if any(iz in mesaj for iz in ("402", "RESOURCE_EXHAUSTED", "429",
+                                      "credits are depleted", "quota")):
+            raise SaglayiciTukendi(
+                "Gemini kotası/kredisi tükenmiş. Belge analizi ve soru "
+                "yeniden yazma bu yüzden çalışmıyor; arşiv araması ve "
+                "atıf denetimi etkilenmez (onlar yerel)."
+            ) from exc
+        log.warning("mesele ayrilamadi: %s", mesaj[:80])
         return []
 
     satirlar = []
@@ -90,5 +131,4 @@ def meseleleri_ayir(soru: str, uretici) -> list[str]:
         # meseleler eleniyor ve liste bosaliyordu.
         if 6 <= len(s) <= 140:
             satirlar.append(s)
-    # Tek mesele ciktiysa ayirmanin faydasi yok
-    return satirlar[:4] if len(satirlar) >= 2 else []
+    return satirlar[:4] if len(satirlar) >= en_az else []

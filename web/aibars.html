@@ -390,6 +390,35 @@
   }
   .mod-not { font-size: 11.5px; color: var(--metin-sol); margin-left: 4px; }
 
+  /* ---------- sizinti taramasi ---------- */
+  .sizinti {
+    max-width: 980px; margin: 0 auto 10px; padding: 11px 14px;
+    background: var(--yuzey); border: 1px solid var(--kenar);
+    border-left: 3px solid var(--uyari); border-radius: 2px;
+    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
+  }
+  .sizinti.olasi { border-left-color: var(--kenar); }
+  .sizinti-tur {
+    font-family: var(--daktilo); font-size: 10.5px; letter-spacing: .05em;
+    text-transform: uppercase; color: var(--uyari); white-space: nowrap;
+  }
+  .sizinti.olasi .sizinti-tur { color: var(--metin-sol); }
+  .sizinti-deger {
+    font-family: var(--daktilo); font-size: 13px; font-weight: 700;
+    color: var(--metin);
+  }
+  .sizinti-baglam {
+    flex: 1; min-width: 200px; font-size: 12px; color: var(--metin-sol);
+  }
+  .sizinti-gizle {
+    font: inherit; font-size: 11.5px; cursor: pointer;
+    padding: 4px 10px; color: var(--metin-orta);
+    background: var(--bg); border: 1px solid var(--kenar);
+    border-radius: 2px; white-space: nowrap;
+  }
+  .sizinti-gizle:hover { border-color: var(--vurgu); color: var(--vurgu); }
+  .sizinti-gizle.bitti { color: #1d6b52; border-color: #b6d8ca; }
+
   /* ---------- atif denetimi ---------- */
   .denetim-ozet {
     display: flex; flex-wrap: wrap; gap: 8px;
@@ -3035,6 +3064,7 @@ function belgeCiz(d, dosyaAdi) {
         kacis(d.maskeli) + "</textarea>" +
       '<div class="onay-alt">' +
         '<button class="onay-gonder" id="onayGonder">Onayla ve analiz et</button>' +
+        '<button class="onay-indir" id="onayTara">Kalanları tara</button>' +
         '<button class="onay-indir" id="onayDenetle">Atıfları denetle</button>' +
         '<button class="onay-indir" id="onayIndir">Maskeli PDF indir</button>' +
         '<button class="onay-vazgec" id="onayVazgec">Vazgeç</button>' +
@@ -3057,6 +3087,93 @@ function belgeCiz(d, dosyaAdi) {
   blok.querySelector("#onayDenetle").onclick = function () {
     atifDenetle(blok);
   };
+  blok.querySelector("#onayTara").onclick = function () {
+    sizintiTara(blok);
+  };
+  blogaKaydir(blok);
+}
+
+/* SIZINTI TARAMASI. Maskelemeden SONRA kalan tanitici izleri
+   isaretler: dosya esas numarasi, sasi, vergi no, arac markasi, az
+   bilinen yer adi, sozlukte olmayan isim.
+
+   MASKELEMIYOR, ISARETLIYOR. Bu izlerin kalipli bir bicimi yok;
+   otomatik gizlemek metni delik desik ederdi. Karar avukatin --
+   "gizle" dugmesi metindeki o degeri yer tutucuyla degistiriyor. */
+async function sizintiTara(blok) {
+  const dugme = blok.querySelector("#onayTara");
+  const kutu = blok.querySelector("#maskeliMetin");
+  const eski = dugme.textContent;
+  dugme.disabled = true;
+  dugme.textContent = "Taranıyor…";
+  try {
+    const r = await fetch("api/sizinti", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metin: kutu.value }),
+    });
+    if (!r.ok) {
+      const h = await r.json().catch(function () { return {}; });
+      throw new Error(h.detail || ("sunucu " + r.status));
+    }
+    sizintiCiz(await r.json(), kutu);
+  } catch (hata) {
+    konusmaEkle('<div class="hata">Taranamadı.<code>' +
+      kacis(hata.message) + "</code></div>", "gecici");
+  } finally {
+    dugme.disabled = false;
+    dugme.textContent = eski;
+  }
+}
+
+function sizintiCiz(d, kutu) {
+  const o = d.ozet || {};
+  let h = '<div class="ozet-kagit"><div class="sorulan">' +
+    '<span class="sorulan-etiket">Kalan izler</span>' +
+    (o.kesin || 0) + " belirgin, " + (o.olasi || 0) + " olası</div></div>";
+
+  if (!o.kesin && !o.olasi) {
+    h += '<div class="bilgi">Kalıplı bir tanıtıcı iz bulunamadı. ' +
+      "Yine de olayın kendisi kimliği ele verebilir.</div>";
+  }
+
+  (d.kesin || []).forEach(function (x) {
+    h += '<div class="sizinti">' +
+      '<span class="sizinti-tur">' + kacis(x.tur) + "</span>" +
+      '<span class="sizinti-deger">' + kacis(x.deger) + "</span>" +
+      '<span class="sizinti-baglam">' + kacis(x.baglam) + "</span>" +
+      '<button class="sizinti-gizle" data-gizle="' + kacis(x.deger) +
+        '">Gizle</button></div>';
+  });
+
+  (d.olasi || []).forEach(function (x) {
+    h += '<div class="sizinti olasi">' +
+      '<span class="sizinti-tur">' + (x.gecis > 1 ? x.gecis + " kez" : "olası") + "</span>" +
+      '<span class="sizinti-deger">' + kacis(x.deger) + "</span>" +
+      '<span class="sizinti-baglam">' + kacis(x.baglam) + "</span>" +
+      '<button class="sizinti-gizle" data-gizle="' + kacis(x.deger) +
+        '">Gizle</button></div>';
+  });
+
+  h += '<div class="denetim-not">Bunlar <b>maskelenmedi</b>, yalnızca ' +
+    "işaretlendi — kalıplı bir biçimleri yok, otomatik gizlemek metni " +
+    "bozardı. Gizlemek istediğinizi <b>Gizle</b> ile değiştirin ya da " +
+    "metinde doğrudan düzeltin.</div>";
+
+  const blok = konusmaEkle(h);
+  blok.addEventListener("click", function (e) {
+    const dugme = e.target.closest("[data-gizle]");
+    if (!dugme) return;
+    const deger = dugme.dataset.gizle;
+    // Metindeki her gecisi yer tutucuyla degistir. Kullanicinin
+    // kutuda elle arayip silmesi 20 dakika surerdi.
+    const sayi = (kutu.value.match(new RegExp(
+      deger.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g")) || []).length;
+    kutu.value = kutu.value.split(deger).join("[GIZLI]");
+    dugme.textContent = sayi > 1 ? "gizlendi (" + sayi + ") ✓" : "gizlendi ✓";
+    dugme.classList.add("bitti");
+    dugme.disabled = true;
+  });
   blogaKaydir(blok);
 }
 
@@ -3151,7 +3268,12 @@ async function maskeliIndir(blok, dosyaAdi) {
   dugme.disabled = true;
   dugme.textContent = "Hazırlanıyor…";
   try {
-    const ad = (dosyaAdi || "belge").replace(/\.[^.]+$/, "") + "-maskeli";
+    // DOSYA ADI ORIJINALDEN ALINMIYOR. Once "Mustafa CUFADAR- Delil
+    // Tespiti.udf-maskeli.pdf" gibi bir ad uretiliyordu: icerik
+    // maskeliydi ama ADI muvekkilin adini tasiyordu ve dosya birine
+    // gonderilince isim de gidiyordu. Maskelemenin butun anlami kacar.
+    const bugun = new Date().toISOString().slice(0, 10);
+    const ad = "maskeli-belge-" + bugun;
     const r = await fetch("api/belge/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
