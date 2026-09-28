@@ -103,6 +103,11 @@ LOCAL_MODEL_PATH = os.getenv("LOCAL_MODEL_PATH", "models/qwen2.5-3b-instruct-q4_
 LOCAL_GPU_LAYERS = int(os.getenv("LOCAL_GPU_LAYERS", "0"))
 LOCAL_CTX = int(os.getenv("LOCAL_CTX", "8192"))
 
+# Sunucu acilirken modelleri onceden yukle. Olculdu: ilk soru 168.2 sn,
+# sonrakiler 20.5 sn -- aradaki ~148 saniye tembel yuklemenin bedeli ve
+# faturayi ilk kullanici oduyor. Isitma bunu acilisa tasiyor.
+ISITMA = os.getenv("ISITMA", "1") not in ("0", "false", "hayir")
+
 # mevzuat.gov.tr tur kodlari (MevzuatTur parametresi)
 MEVZUAT_TURLERI = {
     1: "Kanun",
@@ -260,7 +265,22 @@ COCUK_ARAMA = os.getenv("COCUK_ARAMA", "0") not in ("0", "false", "hayir")
 # terimi demek ve BM25 275 bin belgeyi o kadar terimle tariyor.
 #
 # Madde atifli sorgularda ("TBK 344") devreye girmez.
-HYDE = os.getenv("HYDE", "1") not in ("0", "false", "hayir")
+# VARSAYILAN SAGLAYICIYA BAGLI. HyDE'nin kendisi iyi bir fikir ama iyi bir
+# model istiyor: soruyu KANUN DILINDE bir hukum gibi yeniden yazmasi lazim.
+#
+# Gemini ile olculdu   : MRR 0,734 -> 0,956, ilk sirada 23/34 -> 32/34
+# Qwen3-4B ile olculdu : HyDE acik 0,682 / kapali 0,756  (34 soru, rerank acik)
+#                        ilk-1  22/34 vs 24/34
+#                        ilk-3  22/34 vs 26/34
+#                        ilk-5  27/34 vs 29/34
+#                        sure   12,55 vs 8,79 sn/soru
+#
+# Yerel model dort olcutte de kotulestiriyor ve %30 yavaslatiyor. Sebebi
+# ciktisinda gorunuyor: hukum yazmak yerine soruyu tekrar ediyor ya da
+# hukuken yanlis bir sey uyduruyor ("Ayipli arac sahibi araci hemen teslim
+# etmek zorundadir"). Ozellik duruyor; HYDE=1 ile elle acilabilir.
+_HYDE_VARSAYILAN = "0" if PROVIDER == "local" else "1"
+HYDE = os.getenv("HYDE", _HYDE_VARSAYILAN) not in ("0", "false", "hayir")
 
 # HyDE aciktayken HAM SORUYU da ayri bir sinyal olarak RRF'e katma
 # agirligi. 0 = katma (yalnizca HyDE metniyle ara).

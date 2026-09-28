@@ -13,6 +13,7 @@ MRR tek basina en bilgilendirici olan; "ilk 5'te var" demek, 5. sirada olmakla
 """
 from __future__ import annotations
 
+import sys
 import argparse
 import io
 import logging
@@ -100,10 +101,23 @@ def main() -> None:
     out.write(f"sure        : {sure:.1f} sn ({sure / n:.2f} sn/soru)\n")
 
     metin = out.getvalue()
-    print(metin)
+
+    # DOSYA ONCE YAZILIYOR, EKRANA SONRA BASILIYOR. Tersi bir kez 20
+    # dakikalik olcumu cope atti: Windows konsolu cp1254 ile calisiyor
+    # ve rapordaki U+0307 (birlesen nokta) karakterini yazamayip
+    # UnicodeEncodeError firlatti; print() coktugu icin dosya yazma
+    # satirina hic gelinmedi. Olcum bitti, sonuc kayboldu.
     if args.cikti:
         with open(args.cikti, "w", encoding="utf-8") as f:
             f.write(metin)
+
+    # Ekrana basarken kodlama hatasi olcumu oldurmemeli.
+    try:
+        print(metin)
+    except UnicodeEncodeError:
+        kodlama = getattr(sys.stdout, "encoding", None) or "ascii"
+        sys.stdout.buffer.write(metin.encode(kodlama, errors="replace"))
+        sys.stdout.flush()
 
 
 if __name__ == "__main__":

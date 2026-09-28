@@ -136,6 +136,36 @@ def kaynaklar():
     return _kaynaklar
 
 
+
+
+def isit() -> None:
+    """Modelleri ONCEDEN yukler: ilk gercek soru pahaliya patlamasin.
+
+    OLCULDU. Ayni soru ust uste calistirildiginda:
+
+        1. kosu   168.2 sn   (37.3 LLM + 130.8 arama)
+        2. kosu    21.5 sn   (13.7 LLM +   7.9 arama)
+        3. kosu    20.5 sn   (12.7 LLM +   7.8 arama)
+
+    Yani ~148 saniye BIR KERELIK yukleme: gomucu, yeniden siralayici
+    (bge-reranker-v2-m3) ve llama modeli hepsi ilk KULLANIMDA
+    yukleniyor. kaynaklar() nesneleri kuruyor ama agirligi indirmiyor;
+    o yuzden burada sahte bir sorgu ve sahte bir uretim yapiliyor.
+
+    Sonucu atiliyor; amac yalnizca agirliklari bellege aldirmak.
+    Hata yutuluyor: isitma bir iyilestirme, onkosul degil -- basarisiz
+    olursa sunucu yine calisir, sadece ilk soru yavas olur.
+    """
+    k = kaynaklar()
+    try:
+        k["retriever"].ara("kira sozlesmesinin feshi", limit=3)
+    except Exception as exc:
+        log.warning("arama isitilamadi: %s", str(exc)[:100])
+    try:
+        k["generator"].kisa("isin", sistem="Tek kelime yaz.", max_token=4)
+    except Exception as exc:
+        log.warning("uretici isitilamadi: %s", str(exc)[:100])
+    log.info("isitma bitti: ilk soru artik gecikmeli olmayacak")
 # Yerel kulliyattan bu sayidan az karar gelirse Yargitay'a canli cikilir.
 # 1 degil 2: tek bir karar cogu zaman konuya teget bir kararla eslesmis
 # oluyor ve avukata "emsal yok" demekten farksiz.
@@ -1405,5 +1435,14 @@ if __name__ == "__main__":
             "Once onu kapatin (Gorev Yoneticisi'nde python.exe) ya da:\n"
             "  taskkill /F /IM python.exe"
         )
+
+    # Isitma AYRI IS PARCACIGINDA: sunucu hemen porta baglansin, agirliklar
+    # arkada yuklensin. Ayni parcacikta yapilsa acilis ~2.5 dakika surer ve
+    # bu sure boyunca sunucu hic cevap vermez -- kullanici cokmus sanir.
+    if config.ISITMA:
+        import threading
+
+        threading.Thread(target=isit, daemon=True, name="isitma").start()
+        log.info("isitma arka planda basladi")
 
     uvicorn.run(app, host=config.HOST, port=config.PORT, log_level="info")
