@@ -21,6 +21,20 @@ from fastapi.testclient import TestClient   # noqa: E402
 import server                                # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def ad_katmani_kapali(monkeypatch):
+    """Isim katmani bu testlerde KAPALI.
+
+    Acik birakilinca /api/belge gercekten 2,5 GB'lik yerel modeli
+    yukluyor: tek test 38 saniye surdu, paket 31 sn'den 77 sn'ye cikti
+    ve model dosyasi olmayan bir makinede hic calismaz hale geldi.
+
+    Burada olculen sey maskeleme AKISI. Isim katmaninin kendi davranisi
+    tests/test_ad_bul.py'de sahte ureticiyle, modelsiz olculuyor.
+    """
+    monkeypatch.setattr(server.config, "AD_BUL", False)
+
+
 @pytest.fixture()
 def istemci():
     server.app.dependency_overrides[server.kimlik] = lambda: "test"

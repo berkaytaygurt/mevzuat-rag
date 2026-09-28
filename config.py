@@ -108,6 +108,12 @@ LOCAL_CTX = int(os.getenv("LOCAL_CTX", "8192"))
 # faturayi ilk kullanici oduyor. Isitma bunu acilisa tasiyor.
 ISITMA = os.getenv("ISITMA", "1") not in ("0", "false", "hayir")
 
+# Belgedeki kisi adlarini yerel modele buldur. Olculdu (7 belge turu,
+# 19 gold isim): sabit 71 kisilik sozluk 3/19 buluyor, yerel model
+# 19/19 ve sifir gurultu. Bedeli ~10 sn/belge -- yukleme 0,1 sn'den
+# buna cikiyor. Kapatilirsa isim tespiti yine sabit sozluge duser.
+AD_BUL = os.getenv("AD_BUL", "1") not in ("0", "false", "hayir")
+
 # mevzuat.gov.tr tur kodlari (MevzuatTur parametresi)
 MEVZUAT_TURLERI = {
     1: "Kanun",

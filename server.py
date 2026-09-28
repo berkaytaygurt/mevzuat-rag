@@ -517,6 +517,30 @@ async def belge_yukle(dosya: UploadFile = File(...)):
 
     maske = Maske()
     onerilen = aday_bul(metin)
+
+    # ISIM KATMANI. Sabit ADLAR sozlugu Turkce isimleri kapsayamiyor:
+    # olculdu, yedi belge turunde 19 gold isimden 3'unu buluyor. Yerel
+    # model 19/19 buluyor ve kurum/yer adi listelemiyor.
+    #
+    # MODELE "MASKELE" DENMIYOR, "BUL" DENIYOR -- bkz. core/ad_bul.py.
+    # Donen adlar ayni deterministik yoldan (maske.ekle) geciyor, yani
+    # degistirme islemini yine kod yapiyor.
+    #
+    # ESZAMANLI, BILEREK: ~10 sn ekliyor ama isimler avukat maskeli
+    # metni ONAYLAMADAN once gizlenmis olmali. Sonradan eklenseydi
+    # avukat isimleri hala gorunen bir metni onaylayip gonderebilirdi.
+    if config.AD_BUL:
+        from core.ad_bul import adlari_bul
+        try:
+            for ad in adlari_bul(metin, kaynaklar()["generator"]):
+                maske.ekle(ad, "KISI")
+        except Exception as exc:
+            # Isim katmani cokerse belge yine maskelenmeli: kalipli
+            # tanimlayicilar (TC, IBAN, telefon) zaten gizlenmis olur ve
+            # avukat maskeli metni gorup eksigi elle isaretler. Sessiz
+            # kalmiyoruz -- gunlukte gorunuyor.
+            log.warning("isim katmani calismadi: %s", str(exc)[:120])
+
     for tur, liste in onerilen.items():
         for deger in liste:
             maske.ekle(deger, tur)
