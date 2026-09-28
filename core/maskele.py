@@ -53,6 +53,51 @@ PLAKA_RE = re.compile(r"\b(0[1-9]|[1-7]\d|8[01])\s?[A-ZÇĞİÖŞÜ]{1,3}\s?\d{2
 IBAN_RE = re.compile(r"\bTR\s?(?:\d{2}\s?)(?:\d{4}\s?){5}\d{2}\b", re.IGNORECASE)
 ONBIR_HANE_RE = re.compile(r"(?<!\d)\d{11}(?!\d)")
 
+# --- Asagidakiler once yalnizca core/sizinti.py'de vardi: ISARETLENIYOR
+# ama MASKELENMIYORLARDI. Gercek bir dilekcede olculdu, 12 gizli alandan
+# ucu tam bu yuzden maskeli metinde kaldi. Isaretlemek yetmiyor; avukat
+# maskeli metni oldugu gibi baska bir araca verirse bunlar disari cikar.
+#
+# IKISI ETIKET TEMELLI, BILEREK. Ciplak desenleri maskeleme katmaninda
+# kullanmak tehlikeli: vergi no sadece 10 hane demek, belgedeki her 10
+# haneli sayiyi (tutar, tarih dizisi, sayfa kodu) silerdi. Tarama
+# katmaninda fazla isaretlemenin bedeli iki saniye, maskelemede metni
+# bozmak. O yuzden burada yalniz ETIKETLI bicim maskeleniyor; ciplak
+# hali sizinti.py'de isaretlenmeye devam ediyor.
+
+# "DOSYA NO : 2026/1184"  ya da  "2026/1184 D.Is" / "E." / "K."
+# D.Is (degisik is) EKSIKTI: sizinti.py yalnizca E./K./Esas/Karar
+# tanidigi icin delil tespiti dosyalarinin numarasi hic yakalanmiyordu --
+# oysa delil tespiti dosyalari tam olarak "D.Is" diye numaralanir.
+DOSYA_NO_ETIKETLI_RE = re.compile(
+    r"(dosya\s*(?:no|numara(?:sı|si))?\s*[:.]?\s*)"
+    r"((?:19|20)\d{2}\s*/\s*\d{1,6})", re.IGNORECASE)
+# YALNIZ "D.Is" EKI. E./K. bilerek DISARIDA birakildi: o bicim hukuk
+# metninde neredeyse her zaman ATIF YAPILAN Yargitay kararidir ("Yargitay
+# 9. HD 2019/1234 E. 2021/567 K."), muvekkilin dosyasi degil. Maskelense
+# dilekcenin hukuki dayanagi silinir ve sistem karari bulamaz -- mevcut
+# test_kanun_ve_madde_numaralari_korunuyor testi bunu yakaladi.
+# Etiketli bicim ("DOSYA NO : ...") her ekle maskelenmeye devam ediyor;
+# etiketsiz E./K. ise core/sizinti.py'de ISARETLENIYOR, karar avukatin.
+DOSYA_NO_EKLI_RE = re.compile(
+    r"\b(?:19|20)\d{2}\s*/\s*\d{1,6}"
+    r"(?=\s*D\.\s*[İIi]?[şsŞS])")
+# "VERGI NO : 4820573916" -- yalniz ETIKETLIYKEN maskeleniyor.
+VERGI_NO_RE = re.compile(
+    r"(vergi\s*(?:kimlik\s*)?(?:no|numara(?:sı|si))?\s*[:.]?\s*)"
+    r"(\d{10})(?!\d)", re.IGNORECASE)
+# Sasi / VIN: 17 karakter, I-O-Q harfleri kullanilmaz.
+SASI_RE = re.compile(r"\b[A-HJ-NPR-Z0-9]{17}\b")
+
+
+def sasi_gibi(dizi: str) -> bool:
+    """17 karakterlik dizi gercekten sasi numarasi mi.
+
+    Desen tek basina yetmiyor: 17 haneli duz bir sayi (tutar, referans
+    kodu) da esliyor. Gercek sasi numarasi HEM harf HEM rakam tasir.
+    """
+    return any(c.isalpha() for c in dizi) and any(c.isdigit() for c in dizi)
+
 
 def tc_gecerli(no: str) -> bool:
     """TC kimlik numarasinin saglama hanelerini dogrular.
@@ -113,10 +158,30 @@ class Maske:
         def degistir(eslesme, tur):
             return self._yer_tutucu(tur, eslesme.group(0))
 
+        def etiketli_degistir(eslesme, tur):
+            """Etiketi birakip yalniz DEGERI maskeler.
+
+            "VERGİ NO : 4820573916" -> "VERGİ NO : [VERGINO_1]".
+            Etiket de silinseydi metin okunmaz hale gelir, avukat neyin
+            gizlendigini goremezdi.
+            """
+            return eslesme.group(1) + self._yer_tutucu(tur, eslesme.group(2))
+
         # SIRA ONEMLI: IBAN icinde 11 haneli dizi bulunabilir, once IBAN.
         metin = IBAN_RE.sub(
             lambda m: degistir(m, "IBAN") if iban_gecerli(m.group(0))
             else m.group(0), metin)
+        # Sasi erken: 17 karakterlik butun bir belirtec, parcalanmasin.
+        metin = SASI_RE.sub(
+            lambda m: degistir(m, "SASI") if sasi_gibi(m.group(0))
+            else m.group(0), metin)
+        # VERGI, TELEFON'DAN ONCE OLMALI. Telefon deseni 5 ile baslayan
+        # on haneli diziyi esliyor; 5 ile baslayan bir vergi numarasi
+        # telefon sanilip once o yer tutucuyu alirdi.
+        metin = VERGI_NO_RE.sub(lambda m: etiketli_degistir(m, "VERGINO"), metin)
+        metin = DOSYA_NO_ETIKETLI_RE.sub(
+            lambda m: etiketli_degistir(m, "DOSYA"), metin)
+        metin = DOSYA_NO_EKLI_RE.sub(lambda m: degistir(m, "DOSYA"), metin)
         metin = EPOSTA_RE.sub(lambda m: degistir(m, "EPOSTA"), metin)
         # TC yalnizca saglama tutuyorsa maskeleniyor.
         metin = ONBIR_HANE_RE.sub(
